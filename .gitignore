@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+mlruns/
+data/raw/*
+data/interim/*
+data/processed/*
+!data/*/.gitkeep
+.pytest_cache/

@@ -1,0 +1,18 @@
+random_seed: 42
+target:
+  matured_statuses: ["Fully Paid", "Charged Off", "Default"]
+  indeterminate_statuses: ["Current", "In Grace Period", "Late (16-30 days)", "Late (31-120 days)"]
+split:
+  strategy: "out_of_time"
+  time_column: "issue_d"
+  # Cutoffs grounded in real censoring analysis (EDA phase 3, sample n=299,970):
+  # % loans still censored (Current/Late/Grace) by issue year:
+  # 2007-2013: 0% | 2014: 5.3% | 2015: 10.8% | 2016: 32.5% | 2017: 61.8% | 2018: 88.6%
+  # Recent vintages' "matured" subset is a biased sample (fast-resolving loans only),
+  # not representative - so 2016 is borderline and 2017-2018 are unusable as labels.
+  train_end: "2015-12"
+  oot_test_start: "2016-01"
+  oot_test_end: "2016-12"
+  # Excluded from label-based train/test (too immature to trust matured subset);
+  # reserved for feature-drift monitoring simulation in phase 9 instead.
+  monitoring_only_start: "2017-01"
