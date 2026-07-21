@@ -83,8 +83,62 @@ not leakage), consistent with the grade/int_rate relationship confirmed in point
 Note: IV is univariate: "not useful individually" doesn't rule out value via
 interactions in the GBM champion model - only rules them out of the WOE scorecard baseline.
 
-## 9. Ready for Phase 4
-Open items to resolve before feature engineering is "done": (a) confirm vintage-dependent
-bureau fields' coverage within the 2012-2015 train window, (b) decide `annual_inc`
-treatment (cap vs. log), (c) build `has_history` flags for structurally-missing fields.
-Everything else above is finalized and enforced in code.
+## 9. Phase 4 open items - resolved
+All three items below are now enforced in `features/cleaning.py` and `features/woe.py`
+(tested in `tests/test_cleaning.py`, `tests/test_woe.py`), not just documented here.
+
+**(a) Vintage-dependent bureau fields** - decisively excluded. Checked missing-rate by
+issue year: 95-100% missing for 2007-2015 (our entire train window), 0% missing from
+2016 onward. Training would never see real values while serving would always have
+them - a train/serve mismatch, not just sparse data. See `EXCLUDED_VINTAGE_COLUMNS`
+in `data/schema.py`.
+
+**(b) `annual_inc` treatment** - winsorized at p99.5 (350,000). Observed distribution
+jumps from p99.9=600,000 to p100=61,000,000 - an isolated, near-certainly erroneous
+outlier. Capping (not dropping) preserves the row while blunting the distortion.
+See `WINSORIZE_CAPS` in `data/schema.py`, applied via `features/cleaning.winsorize()`.
+
+**(c) `has_history` flags** - implemented in `features/cleaning.add_has_history_flags()`.
+Also fixed a real gap this surfaced: `features/woe.py` was silently dropping nulls
+before computing IV, which would have systematically under-measured any feature
+where missingness is informative. Nulls now form their own explicit WOE bin.
+Result on real data, however, was a negative finding worth recording honestly:
+`mths_since_last_delinq` (IV 0.0036) and its `has_history` flag (IV 0.0026) are both
+"not useful" individually in this dataset - the hypothesis that missingness would be
+strongly predictive here did not hold up. Kept as features anyway (cost is low, GBM
+may still find interaction value) but not prioritized for the scorecard.
+
+Additional fields cleaned in this pass: `term` parsed to integer `term_months` (IV
+0.177, matches the earlier estimate), `earliest_cr_line` replaced by derived
+`credit_history_months` (IV 0.0076 - low, kept for completeness not as a priority
+feature), `dti` sentinel (999) nulled before any binning.
+
+## 11. Feature matrix assembled (`features/build_dataset.py`)
+Before finalizing, ran the same missingness/cardinality/IV screen used in section 8
+across all 49 previously-unexamined columns (not just the original curated 19) -
+consistent with the "don't assume unexamined means safe" principle. Found and
+resolved: a second vintage-dependent group (`num_tl_*`, `mo_sin_*`, `bc_*`, and
+related bureau summary fields) - unlike `EXCLUDED_VINTAGE_COLUMNS`, these are only
+missing for the small-volume 2007-2012 tail (max 10.9% missing across the full
+train window, 5% in OOT test 2016) and are kept, relying on the null-as-own-bin
+WOE fix from section 9. Also dropped 4 redundant/constant columns (`funded_amnt`,
+`funded_amnt_inv`, `fico_range_high`, `policy_code`, `pymnt_plan`) - see
+`REDUNDANT_OR_CONSTANT_COLUMNS` in `data/schema.py`.
+
+Two feature sets reflect the champion-challenger design: `SCORECARD_FEATURES` (31
+columns, IV >= 0.02, no redundant pairs) for the interpretable logistic baseline;
+`gbm_features()` (76 columns, broader) for the GBM champion, which can exploit
+weak/interacting signals a WOE scorecard cannot represent.
+
+Final assembled matrix: 148,940 matured loans (train 110,046 / OOT test 38,894).
+
+**Finding worth carrying into Phase 5**: OOT test default rate (23.3%) is 4.8pp
+higher than train (18.5%). This is not an error - it is direct evidence for why
+an out-of-time split matters more than a random split here. The GBM/scorecard
+will need calibration checked specifically against this shift, not just
+discrimination (AUC/KS), when we reach the evaluation phase.
+
+## 12. Ready for Phase 4 modeling
+Feature matrix is assembled, split-tagged, and reproducible end-to-end from
+`assemble_feature_matrix()`. Next: scorecard baseline (WOE binning + logistic
+regression) and GBM champion (LightGBM) training.

@@ -1,4 +1,8 @@
-"""Weight of Evidence and Information Value for feature screening and interpretable binning.    """
+"""Weight of Evidence and Information Value for feature screening and interpretable binning.
+
+IV rule of thumb (standard credit scoring convention): <0.02 not useful,
+0.02-0.1 weak, 0.1-0.3 medium, 0.3-0.5 strong, >0.5 suspicious - re-check for leakage.
+"""
 
 import polars as pl
 
@@ -7,14 +11,28 @@ _EPS = 1e-6
 
 
 def woe_iv_table(df: pl.DataFrame, feature: str, target: str = "default_flag", n_bins: int = 10) -> pl.DataFrame:
-    """Return per-bin WOE/IV for a feature; numeric features are quantile-binned, categorical used as-is."""
-    working = df.select([feature, target]).drop_nulls()
+    """Return per-bin WOE/IV for a feature; numeric features are quantile-binned, categorical used as-is.
+
+    Nulls form their own explicit "missing" bin rather than being dropped, since
+    missingness is often informative (see STRUCTURALLY_MISSING_COLUMNS in schema.py).
+    """
+    working = df.select([feature, target]).filter(pl.col(target).is_not_null())
     is_numeric = working.schema[feature] in _NUMERIC_DTYPES
 
     if is_numeric:
-        working = working.with_columns(pl.col(feature).qcut(n_bins, allow_duplicates=True).alias("_bin"))
+        non_null = working.filter(pl.col(feature).is_not_null())
+        null_part = working.filter(pl.col(feature).is_null())
+        binned = non_null.with_columns(
+            pl.col(feature).qcut(n_bins, allow_duplicates=True).cast(pl.Utf8).alias("_bin")
+        ).select(["_bin", target])
+        if null_part.height > 0:
+            null_part = null_part.select(pl.lit("missing").alias("_bin"), target)
+            working = pl.concat([binned, null_part])
+        else:
+            working = binned
         group_col = "_bin"
     else:
+        working = working.with_columns(pl.col(feature).fill_null("missing"))
         group_col = feature
 
     total_good = (working[target] == 0).sum()

@@ -49,10 +49,33 @@ JOINT_APPLICATION_COLUMNS = [
 # Free text or near-unique identifiers - drop, or need dedicated encoding (not one-hot).
 HIGH_CARDINALITY_COLUMNS = ["emp_title", "desc", "title", "url", "zip_code"]
 
+# LendingClub only started collecting these bureau trade-line fields around 2015-2016.
+# Verified during EDA: 95-100% missing for issue_year <= 2015 (our train window),
+# 0% missing from 2016 onward. Training would never see real values - excluded entirely
+# for V1, not just deferred, since the train/serve feature availability would mismatch.
+EXCLUDED_VINTAGE_COLUMNS = [
+    "il_util", "open_acc_6m", "all_util", "open_act_il", "open_il_12m", "open_il_24m",
+    "total_bal_il", "open_rv_12m", "open_rv_24m", "max_bal_bc", "inq_fi", "total_cu_tl",
+    "inq_last_12m", "mths_since_rcnt_il",
+]
+
 # Known placeholder/sentinel values found during EDA phase 3 that must be handled
 # explicitly before binning or imputation - they are not genuine extreme observations.
 # dti max observed = 999.0, a clear placeholder against a realistic 0-40 range.
 SENTINEL_VALUES = {"dti": [999.0]}
+
+# p99.5 chosen from the observed distribution (p99.9=600k, p100=61M - an isolated,
+# almost certainly erroneous outlier); winsorize rather than drop to keep the rows.
+WINSORIZE_CAPS = {"annual_inc": 350_000.0}
+
+# Near-duplicate of another kept feature (verified via IV + value comparison) or
+# constant/near-constant with no modeling value. Kept in the raw file, excluded here.
+REDUNDANT_OR_CONSTANT_COLUMNS = [
+    "funded_amnt", "funded_amnt_inv",  # differ from loan_amnt in <0.1% of rows
+    "fico_range_high",  # IV 0.124, near-identical to fico_range_low (IV 0.124) - same score, one kept
+    "policy_code",  # constant (single value) across the entire sample
+    "pymnt_plan",  # 99.97% one value; also ambiguous whether "y" can be set post-origination
+]
 
 # loan_status values with no final outcome yet (right-censored) -> excluded from training.
 INDETERMINATE_STATUSES = [
