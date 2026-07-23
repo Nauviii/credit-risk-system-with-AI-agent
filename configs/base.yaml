@@ -10,7 +10,11 @@ split:
   # 2007-2013: 0% | 2014: 5.3% | 2015: 10.8% | 2016: 32.5% | 2017: 61.8% | 2018: 88.6%
   # Recent vintages' "matured" subset is a biased sample (fast-resolving loans only),
   # not representative - so 2016 is borderline and 2017-2018 are unusable as labels.
-  train_end: "2015-12"
+  train_end: "2014-12"
+  # Validation carved out of the former train window (not random) - same OOT logic
+  # applied one level down, used only for GBM early stopping / hyperparameter choice.
+  validation_start: "2015-01"
+  validation_end: "2015-12"
   oot_test_start: "2016-01"
   oot_test_end: "2016-12"
   # Excluded from label-based train/test (too immature to trust matured subset);

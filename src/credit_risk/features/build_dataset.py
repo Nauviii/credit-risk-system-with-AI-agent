@@ -21,17 +21,11 @@ from credit_risk.features.cleaning import clean_features
 _RAW_COLUMNS_REPLACED_BY_DERIVED = ["term", "earliest_cr_line"]
 _NON_FEATURE_COLUMNS = ["id", "loan_status", "issue_d", "issue_date"]
 
-# IV >= 0.02 in the phase-3/4 screen (docs/eda_findings.md section 8, "weak" or better),
-# minus anything in REDUNDANT_OR_CONSTANT_COLUMNS.
 SCORECARD_FEATURES = [
-    "sub_grade", "grade", "int_rate", "term_months", "fico_range_low",
-    "dti", "verification_status", "loan_amnt", "home_ownership", "annual_inc",
-    "revol_util", "inq_last_6mths", "purpose",
-    "acc_open_past_24mths", "bc_open_to_buy", "avg_cur_bal", "tot_hi_cred_lim",
-    "tot_cur_bal", "num_tl_op_past_12m", "total_bc_limit", "mort_acc", "installment",
-    "percent_bc_gt_75", "num_actv_rev_tl", "bc_util", "num_rev_tl_bal_gt_0",
-    "mo_sin_rcnt_tl", "total_rev_hi_lim", "mo_sin_rcnt_rev_tl_op",
-    "mths_since_recent_bc", "mo_sin_old_rev_tl_op",
+    "sub_grade", "term_months", "fico_range_low", "dti", "bc_open_to_buy",
+    "acc_open_past_24mths", "verification_status", "percent_bc_gt_75", "annual_inc",
+    "loan_amnt", "avg_cur_bal", "mo_sin_rcnt_tl", "num_actv_rev_tl", "mths_since_recent_bc",
+    "mths_since_recent_inq", "purpose", "mort_acc",
 ]
 
 
@@ -57,14 +51,17 @@ def load_split_config(config_path: Path) -> dict:
 
 
 def tag_split(df: pl.DataFrame, split_config: dict) -> pl.DataFrame:
-    """Add a `split` column (train / oot_test / excluded) from issue_d and the configured cutoffs."""
+    """Add a `split` column (train / validation / oot_test / excluded) from issue_d and configured cutoffs."""
     issue_date = pl.col("issue_d").str.strptime(pl.Date, "%b-%Y")
     train_end = pl.lit(split_config["train_end"]).str.strptime(pl.Date, "%Y-%m")
+    val_start = pl.lit(split_config["validation_start"]).str.strptime(pl.Date, "%Y-%m")
+    val_end = pl.lit(split_config["validation_end"]).str.strptime(pl.Date, "%Y-%m")
     oot_start = pl.lit(split_config["oot_test_start"]).str.strptime(pl.Date, "%Y-%m")
     oot_end = pl.lit(split_config["oot_test_end"]).str.strptime(pl.Date, "%Y-%m")
 
     return df.with_columns(
         pl.when(issue_date <= train_end).then(pl.lit("train"))
+        .when((issue_date >= val_start) & (issue_date <= val_end)).then(pl.lit("validation"))
         .when((issue_date >= oot_start) & (issue_date <= oot_end)).then(pl.lit("oot_test"))
         .otherwise(pl.lit("excluded"))
         .alias("split")

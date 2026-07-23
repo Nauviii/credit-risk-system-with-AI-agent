@@ -82,3 +82,70 @@ def rank_features_by_iv(
         .otherwise(pl.lit("not useful"))
         .alias("strength")
     )
+
+
+class WOEEncoder:
+    """Fit WOE bins/values on train only, then apply the frozen mapping anywhere else.
+
+    Prevents the classic scorecard bug: recomputing bins per-dataset makes train and
+    OOT test (or serving) use different, incomparable encodings of the same feature.
+    Bin edges are computed once in fit() and reused via cut() in both fit and
+    transform, so labels always match exactly (qcut vs cut recompute edges
+    independently and can disagree at floating-point precision otherwise).
+    """
+
+    def __init__(self, features: list[str], target: str = "default_flag", n_bins: int = 10):
+        self.features = features
+        self.target = target
+        self.n_bins = n_bins
+        self.bin_edges_: dict[str, list[float]] = {}
+        self.woe_maps_: dict[str, dict[str, float]] = {}
+
+    def _bin_column(self, df: pl.DataFrame, feature: str) -> pl.Expr:
+        """Bin feature using this encoder's stored edges (numeric) or as-is (categorical)."""
+        is_numeric = df.schema[feature] in _NUMERIC_DTYPES
+        if is_numeric:
+            edges = self.bin_edges_[feature]
+            binned = pl.col(feature).cut(edges).cast(pl.Utf8) if edges else pl.lit("single_value")
+            return pl.when(pl.col(feature).is_null()).then(pl.lit("missing")).otherwise(binned)
+        return pl.col(feature).fill_null("missing")
+
+    def fit(self, df: pl.DataFrame) -> "WOEEncoder":
+        """Learn bin edges (numeric) and per-bin WOE values from df - call on train only."""
+        for feature in self.features:
+            is_numeric = df.schema[feature] in _NUMERIC_DTYPES
+            if is_numeric:
+                non_null = df[feature].drop_nulls()
+                qs = [i / self.n_bins for i in range(1, self.n_bins)]
+                self.bin_edges_[feature] = sorted(set(non_null.quantile(q) for q in qs))
+
+            working = df.select([feature, self.target]).filter(pl.col(self.target).is_not_null())
+            binned = working.with_columns(self._bin_column(working, feature).alias("_bin"))
+            total_good = (binned[self.target] == 0).sum()
+            total_bad = (binned[self.target] == 1).sum()
+            grouped = binned.group_by("_bin").agg(
+                (pl.col(self.target) == 0).sum().alias("n_good"),
+                (pl.col(self.target) == 1).sum().alias("n_bad"),
+            )
+            grouped = grouped.with_columns(
+                (((pl.col("n_good") / total_good) + _EPS) / ((pl.col("n_bad") / total_bad) + _EPS))
+                .log().alias("woe")
+            )
+            self.woe_maps_[feature] = dict(zip(grouped["_bin"].cast(pl.Utf8), grouped["woe"]))
+        return self
+
+    def transform(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Apply the frozen bin edges/WOE map from fit() - safe on train, OOT test, or serving data.
+
+        Categories/bins unseen during fit (e.g. a new state, or a bin only present
+        in OOT test) fall back to WOE 0.0 - neutral, not an error, but worth
+        monitoring: a high rate of fallback hits signals population drift.
+        """
+        out = df
+        for feature in self.features:
+            binned = self._bin_column(df, feature)
+            woe_map = self.woe_maps_[feature]
+            out = out.with_columns(
+                binned.replace_strict(woe_map, default=0.0, return_dtype=pl.Float64).alias(f"{feature}_woe")
+            )
+        return out

@@ -1,5 +1,3 @@
-"""One-off script: stratified sample of raw accepted loans for exploration in chat."""
-
 import argparse
 import gzip
 import shutil
