@@ -20,6 +20,7 @@ dependencies = [
     "mlflow>=2.13",
     "matplotlib>=3.8",
     "numba>=0.60",
+    "optuna-integration>=4.9.0",
 ]
 
 [dependency-groups]

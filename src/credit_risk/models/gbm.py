@@ -7,7 +7,7 @@ import polars as pl
 from credit_risk.features.build_dataset import gbm_features
 
 
-def _prepare_lgb_frame(df: pl.DataFrame, features: list[str]) -> pd.DataFrame:
+def prepare_lgb_frame(df: pl.DataFrame, features: list[str]) -> pd.DataFrame:
     """Convert to pandas with string columns as category dtype for LightGBM's native handling."""
     pdf = df.select(features).to_pandas()
     for col in pdf.select_dtypes(include="object").columns:
@@ -20,8 +20,8 @@ def train_gbm(
 ) -> tuple[lgb.Booster, list[str]]:
     """Train LightGBM with early stopping against a time-based validation set (not random)."""
     features = gbm_features(train_df)
-    X_train = _prepare_lgb_frame(train_df, features)
-    X_valid = _prepare_lgb_frame(valid_df, features)
+    X_train = prepare_lgb_frame(train_df, features)
+    X_valid = prepare_lgb_frame(valid_df, features)
 
     default_params = {
         "objective": "binary", "metric": "auc", "learning_rate": 0.05,
@@ -39,5 +39,5 @@ def train_gbm(
 
 def predict_gbm(model: lgb.Booster, features: list[str], df: pl.DataFrame):
     """Score a dataframe with a fitted GBM - returns predicted P(default)."""
-    X = _prepare_lgb_frame(df, features)
+    X = prepare_lgb_frame(df, features)
     return model.predict(X, num_iteration=model.best_iteration)

@@ -4,6 +4,7 @@ IV rule of thumb (standard credit scoring convention): <0.02 not useful,
 0.02-0.1 weak, 0.1-0.3 medium, 0.3-0.5 strong, >0.5 suspicious - re-check for leakage.
 """
 
+import pandas as pd
 import polars as pl
 
 _NUMERIC_DTYPES = (pl.Float64, pl.Float32, pl.Int64, pl.Int32)
@@ -87,6 +88,12 @@ def rank_features_by_iv(
 class WOEEncoder:
     """Fit WOE bins/values on train only, then apply the frozen mapping anywhere else.
 
+    Convention: WOE = ln(dist_good / dist_bad). Higher WOE means safer. When used
+    as input to a model predicting P(default=1), well-specified coefficients come
+    out NEGATIVE (higher WOE -> lower predicted default probability) - this is
+    correct, not a sign-flip bug. Verified with a single clean feature (no
+    multicollinearity possible) before trusting this in tests/test_woe.py.
+
     Prevents the classic scorecard bug: recomputing bins per-dataset makes train and
     OOT test (or serving) use different, incomparable encodings of the same feature.
     Bin edges are computed once in fit() and reused via cut() in both fit and
@@ -149,3 +156,14 @@ class WOEEncoder:
                 binned.replace_strict(woe_map, default=0.0, return_dtype=pl.Float64).alias(f"{feature}_woe")
             )
         return out
+
+
+def prune_correlated_features(features_by_priority: list[str], corr: pd.DataFrame, threshold: float = 0.6) -> list[str]:
+    """Greedily keep each feature (in priority order, e.g. IV descending) unless it
+    correlates above threshold with an already-kept one - avoids near-duplicate
+    features destabilizing a logistic regression (e.g. grade/sub_grade/int_rate)."""
+    kept: list[str] = []
+    for f in features_by_priority:
+        if all(abs(corr.loc[f, k]) < threshold for k in kept):
+            kept.append(f)
+    return kept

@@ -13,26 +13,50 @@ stopping), OOT test 2016 unchanged. Default rate rises across all three splits
 (17.0% -> 20.2% -> 23.3%), consistent with the drift documented in
 `eda_findings.md` section 11.
 
-## Results (full dataset)
+## Results (FINAL - full dataset, confirmed feature sets)
+
+Scorecard: 16 features (`SCORECARD_FEATURES`, clean - zero multicollinearity above
+0.6, all coefficients negative as expected). GBM: 76 features (`gbm_features()`).
 
 | Split | Scorecard AUC | Scorecard Gini | Scorecard KS | GBM AUC | GBM Gini | GBM KS |
 |---|---|---|---|---|---|---|
-| train | 0.704 | 0.408 | 0.297 | 0.756 | 0.513 | 0.377 |
-| validation | 0.733 | 0.466 | 0.340 | 0.743 | 0.485 | 0.353 |
-| oot_test | 0.708 | 0.417 | 0.301 | 0.721 | 0.442 | 0.318 |
+| train | 0.702 | 0.404 | 0.293 | 0.756 | 0.513 | 0.377 |
+| validation | 0.732 | 0.463 | 0.336 | 0.743 | 0.485 | 0.353 |
+| oot_test | 0.707 | 0.414 | 0.297 | 0.721 | 0.442 | 0.318 |
 
-## Finding: GBM earns its complexity on full data (revised from the sample checkpoint)
-On the 300k sample, GBM only tied the scorecard on OOT test (+0.001 AUC) while
-overfitting badly (train-OOT gap 0.086). On the full 2.26M-row dataset, that
-gap shrinks to 0.035, and GBM genuinely beats the scorecard on OOT test: +0.013
-AUC, +0.025 Gini, +0.017 KS - no longer a statistical tie. This matches the
-expected pattern: a higher-capacity model like GBM needs enough data to learn
-real signal rather than train-set noise, and the earlier near-tie was a data
-volume limitation, not evidence the extra complexity was unjustified. Still,
-this uses **untuned default hyperparameters** for GBM - the comparison is not
-final until Optuna tuning is done.
+Reproduced via `scripts/train_baseline.py --input data/raw/accepted_2007_to_2018Q4.csv`.
+Cutting the scorecard from 31 to 16 features (removing redundant/collinear ones -
+see section below) cost essentially nothing: OOT AUC moved from 0.708 to 0.707,
+noise-level. The dropped features were genuinely uninformative, not a tradeoff.
 
-## What's not yet done (before picking a champion)
+GBM continues to beat the scorecard on OOT test (+0.014 AUC, +0.028 Gini,
++0.021 KS) - consistent with the earlier full-data finding, unaffected by the
+scorecard-only feature pruning above.
+
+## Feature selection process (produced the 16 SCORECARD_FEATURES above)
+Full process lives in `notebooks/feature_selection_scorecard.py`, run
+independently by the user on full data and cross-checked against a sample-data
+run - not just asserted. Summary:
+1. IV ranking on the full 76-feature candidate pool -> 29 features with IV >= 0.02.
+2. `woe.prune_correlated_features()` (pairwise, threshold 0.6) -> 17 features.
+   Caught severe pairs like `sub_grade`/`int_rate`/`grade` (corr 0.93-0.97,
+   near-duplicate information) and `num_rev_tl_bal_gt_0`/`num_actv_rev_tl` (0.99).
+3. `evaluation.diagnostics.drop_until_signs_are_clean()` -> 16 features. Pairwise
+   pruning alone left `percent_bc_gt_75` with an unexpected positive coefficient
+   (multi-feature collinearity, not caught by pairwise correlation) - this
+   iterative step refits and drops until every coefficient sign is correct.
+4. Full-data run matched the sample-data run on every feature except one pair of
+   near-twins (corr 0.99) where full data's IV tiebreak differed - strong
+   evidence the selection is stable, not sample-specific noise.
+
+## Pre-tuning sanity check: scorecard coefficient signs (historical note)
+Before the process above existed, a 31-feature scorecard showed 24/31 negative
+coefficients, which looked like a bug. Root-caused via a clean single-feature
+synthetic test: negative is mathematically correct given our WOE convention
+(`WOE = ln(dist_good/dist_bad)`, higher = safer) and target definition
+(`default_flag=1` = bad) - documented directly in `WOEEncoder`'s docstring so
+it isn't re-litigated. The actual anomaly is a POSITIVE coefficient, which is
+exactly what steps 2-3 above are designed to catch and remove.
 - Hyperparameter tuning (Optuna) for GBM.
 - Full Phase 5 evaluation: PSI (train vs OOT population stability), calibration
   (Brier/ECE - discrimination held up on OOT despite the default-rate shift, but

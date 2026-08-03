@@ -12,6 +12,7 @@ from pathlib import Path
 
 import mlflow
 import polars as pl
+import yaml
 
 from credit_risk.data.ingestion import load_raw_accepted_loans
 from credit_risk.data.target import build_target
@@ -22,7 +23,16 @@ from credit_risk.models.scorecard import predict_scorecard, train_scorecard
 from credit_risk.tracking import start_run
 
 _CONFIG_PATH = Path("configs/base.yaml")
+_TUNED_PARAMS_PATH = Path("configs/gbm_best_params.yaml")
 _SPLITS = ["train", "validation", "oot_test"]
+
+
+def _load_tuned_gbm_params() -> dict | None:
+    """Load hyperparameters from scripts/tune_gbm.py's output, if it has been run."""
+    if not _TUNED_PARAMS_PATH.exists():
+        return None
+    with open(_TUNED_PARAMS_PATH) as f:
+        return yaml.safe_load(f)
 
 
 def _evaluate_and_log(name: str, splits: dict[str, pl.DataFrame], predict_fn) -> None:
@@ -55,8 +65,14 @@ def main() -> None:
         model, encoder = train_scorecard(splits["train"])
         _evaluate_and_log("Scorecard", splits, lambda d: predict_scorecard(model, encoder, d))
 
-    with start_run("gbm_champion_v1", {"model_type": "lightgbm", "n_features": len(gbm_features(final))}):
-        gbm_model, features = train_gbm(splits["train"], splits["validation"])
+    tuned_params = _load_tuned_gbm_params()
+    gbm_params_source = "tuned (scripts/tune_gbm.py)" if tuned_params else "default (untuned)"
+    print(f"\nGBM hyperparameters: {gbm_params_source}")
+
+    with start_run("gbm_champion_v1", {
+        "model_type": "lightgbm", "n_features": len(gbm_features(final)), "params_source": gbm_params_source,
+    }):
+        gbm_model, features = train_gbm(splits["train"], splits["validation"], params=tuned_params)
         mlflow.log_metric("best_iteration", gbm_model.best_iteration)
         _evaluate_and_log("GBM", splits, lambda d: predict_gbm(gbm_model, features, d))
 

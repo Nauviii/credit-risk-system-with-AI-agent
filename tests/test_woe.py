@@ -1,6 +1,7 @@
 """Tests for WOE/IV correctness using synthetic data with a known ground truth."""
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from credit_risk.features.woe import information_value, rank_features_by_iv
 
@@ -59,3 +60,29 @@ def test_woe_encoder_unseen_category_falls_back_to_zero():
     result = enc.transform(test)
     unseen_woe = result.filter(pl.col("cat_feat") == "D")["cat_feat_woe"].unique().to_list()
     assert unseen_woe == [0.0]
+
+
+def test_prune_correlated_features_keeps_higher_priority_of_a_duplicate_pair():
+    from credit_risk.features.woe import prune_correlated_features
+    # 'a' and 'b' are near-duplicates (like grade/int_rate); 'c' is independent
+    corr = pd.DataFrame(
+        [[1.0, 0.95, 0.1], [0.95, 1.0, 0.1], [0.1, 0.1, 1.0]],
+        columns=["a", "b", "c"], index=["a", "b", "c"],
+    )
+    kept = prune_correlated_features(["a", "b", "c"], corr, threshold=0.6)
+    assert kept == ["a", "c"]
+
+
+def test_drop_until_signs_are_clean_removes_redundant_feature_and_converges():
+    from credit_risk.evaluation.diagnostics import drop_until_signs_are_clean
+    rng = np.random.default_rng(0)
+    n = 3000
+    x1 = rng.uniform(0, 100, n)
+    x2 = x1 + rng.normal(0, 1, n)  # near-duplicate of x1, correlation not pre-pruned here
+    y = rng.binomial(1, np.clip(0.5 - 0.004 * x1, 0.02, 0.98))
+    df = pl.DataFrame({"x1": x1, "x2": x2, "default_flag": y})
+
+    kept, encoder, model = drop_until_signs_are_clean(["x1", "x2"], df)
+    coefs = dict(zip(kept, model.coef_[0]))
+    assert all(c < 0 for c in coefs.values())
+    assert len(kept) <= 2

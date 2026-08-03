@@ -22,10 +22,10 @@ _RAW_COLUMNS_REPLACED_BY_DERIVED = ["term", "earliest_cr_line"]
 _NON_FEATURE_COLUMNS = ["id", "loan_status", "issue_d", "issue_date"]
 
 SCORECARD_FEATURES = [
-    "sub_grade", "term_months", "fico_range_low", "dti", "bc_open_to_buy",
-    "acc_open_past_24mths", "verification_status", "percent_bc_gt_75", "annual_inc",
-    "loan_amnt", "avg_cur_bal", "mo_sin_rcnt_tl", "num_actv_rev_tl", "mths_since_recent_bc",
-    "mths_since_recent_inq", "purpose", "mort_acc",
+    "annual_inc", "sub_grade", "loan_amnt", "term_months", "acc_open_past_24mths",
+    "purpose", "mort_acc", "mths_since_recent_bc", "dti", "avg_cur_bal",
+    "fico_range_low", "bc_open_to_buy", "num_rev_tl_bal_gt_0", "verification_status",
+    "mths_since_recent_inq", "mo_sin_rcnt_tl",
 ]
 
 

@@ -1,8 +1,14 @@
-"""Scorecard diagnostics - coefficient sign sanity check and multicollinearity report."""
+"""Scorecard diagnostics - coefficient sign sanity check and multicollinearity report.
+
+Used from notebooks/feature_selection_scorecard.py during feature selection, kept
+separate from scripts/train_baseline.py (which only trains/evaluates already-decided
+features) so analysis and training stay independently runnable and reviewable.
+"""
 
 import pandas as pd
 import polars as pl
 from sklearn.linear_model import LogisticRegression
+from credit_risk.features.woe import WOEEncoder
 
 
 def coefficient_sign_report(model: LogisticRegression, features: list[str]) -> pd.DataFrame:
@@ -38,3 +44,32 @@ def multicollinearity_report(train_woe: pl.DataFrame, features: list[str], thres
                 })
     result = pd.DataFrame(rows, columns=["feature_a", "feature_b", "correlation"])
     return result.reindex(result["correlation"].abs().sort_values(ascending=False).index).reset_index(drop=True)
+
+
+def drop_until_signs_are_clean(
+    features: list[str], train_df: pl.DataFrame, target: str = "default_flag", n_bins: int = 10, max_iterations: int = 10
+) -> tuple[list[str], "WOEEncoder", LogisticRegression]:
+    """Iteratively refit and drop the worst positive-coefficient feature until none remain.
+
+    Pairwise correlation pruning (woe.prune_correlated_features) only catches
+    two-feature collinearity; three-or-more-feature collinearity can still leave
+    a positive (wrong-sign) coefficient behind. This closes that gap by actually
+    refitting after each drop, rather than assuming one pruning pass is enough.
+    """
+
+    current = list(features)
+    for _ in range(max_iterations):
+        encoder = WOEEncoder(features=current, target=target, n_bins=n_bins).fit(train_df)
+        train_woe = encoder.transform(train_df)
+        woe_cols = [f"{f}_woe" for f in current]
+        model = LogisticRegression(max_iter=1000).fit(
+            train_woe.select(woe_cols).to_pandas(), train_woe[target].to_pandas()
+        )
+        coefs = dict(zip(current, model.coef_[0]))
+        positive = {f: c for f, c in coefs.items() if c > 0}
+        if not positive:
+            return current, encoder, model
+        worst = max(positive, key=positive.get)
+        print(f"dropping '{worst}' (coefficient {positive[worst]:.4f}, still positive)")
+        current.remove(worst)
+    raise RuntimeError(f"did not converge to all-negative coefficients within {max_iterations} iterations")
