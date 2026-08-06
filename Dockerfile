@@ -1,14 +1,20 @@
 # Multi-stage: the builder holds uv and the full toolchain, the runtime holds neither.
 # Keeps the shipped image small and removes the build tooling from the attack surface.
-FROM python:3.12-slim AS builder
 
 # The uv in this image must be AT LEAST as new as the uv that wrote uv.lock. The lockfile
 # carries a `revision` field, and an older uv cannot read a newer revision - `uv sync
 # --frozen` then fails on a lockfile that is perfectly valid locally. Pin this to the
 # output of `uv --version` on the machine that maintains the lock; `latest` is the safe
 # default but gives up build reproducibility.
+#
+# The ARG sits before any FROM (global scope) and the image is pulled as its own stage,
+# because BuildKit does not expand variables in `COPY --from=` - only in `FROM`.
 ARG UV_VERSION=latest
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /bin/uv
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
+FROM python:3.12-slim AS builder
+
+COPY --from=uv /uv /bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
