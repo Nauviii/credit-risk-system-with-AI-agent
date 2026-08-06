@@ -26,6 +26,24 @@ LEAKAGE_COLUMNS = [
     "last_fico_range_high", "last_fico_range_low",  # FICO refreshed during loan life, not at origination
 ]
 
+# Lending Club's own funding mechanics, not applicant attributes. Both are effectively
+# constant inside the train window and only start varying later (initial_list_status is
+# "f" only until ~2012Q4; disbursement_method is "Cash" only until 2016), so they encode
+# vintage rather than risk - the same endogeneity argument as grade/sub_grade/int_rate.
+PLATFORM_COLUMNS = ["initial_list_status", "disbursement_method"]
+
+# LendingClub's OWN risk assessment, not raw applicant data. Not excluded by default -
+# the champion model may use them - but held apart so an application-only variant can be
+# built and the two compared. Measured on the 2016 OOT set, sub_grade alone reaches AUC
+# 0.689, i.e. 93% of the 16-feature scorecard's Gini, so a model that keeps them cannot
+# be said to have earned its discrimination. installment belongs here too: it is a
+# deterministic function of loan_amnt, term and int_rate, so it smuggles the rate back in.
+LENDER_DERIVED_COLUMNS = ["grade", "sub_grade", "int_rate", "installment"]
+
+# Derived by data/target.py. They encode WHEN the label event happened, so using either
+# as a feature leaks the target outright.
+TARGET_TIMING_COLUMNS = ["mob_event", "mob_observable"]
+
 # Present in every raw row but carries zero information (verified during EDA phase 3).
 ALWAYS_MISSING_COLUMNS = ["member_id"]
 

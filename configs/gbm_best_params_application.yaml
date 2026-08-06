@@ -1,0 +1,10 @@
+bagging_fraction: 0.9997378893519588
+bagging_freq: 4
+feature_fraction: 0.4369603063540157
+lambda_l1: 2.689839816686954
+lambda_l2: 2.5521166709898166e-07
+learning_rate: 0.030934505943947067
+min_child_samples: 838
+min_gain_to_split: 0.03236643491262897
+num_leaves: 39
+seed: 42

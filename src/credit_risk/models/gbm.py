@@ -10,16 +10,24 @@ from credit_risk.features.build_dataset import gbm_features
 def prepare_lgb_frame(df: pl.DataFrame, features: list[str]) -> pd.DataFrame:
     """Convert to pandas with string columns as category dtype for LightGBM's native handling."""
     pdf = df.select(features).to_pandas()
-    for col in pdf.select_dtypes(include="object").columns:
+    for col in pdf.select_dtypes(include=["object", "string"]).columns:
         pdf[col] = pdf[col].astype("category")
     return pdf
 
 
 def train_gbm(
-    train_df: pl.DataFrame, valid_df: pl.DataFrame, target: str = "default_flag", params: dict | None = None
+    train_df: pl.DataFrame,
+    valid_df: pl.DataFrame,
+    target: str = "default_flag",
+    params: dict | None = None,
+    features: list[str] | None = None,
 ) -> tuple[lgb.Booster, list[str]]:
-    """Train LightGBM with early stopping against a time-based validation set (not random)."""
-    features = gbm_features(train_df)
+    """Train LightGBM with early stopping against a time-based validation set (not random).
+
+    features defaults to the full pool; pass application_features(df) to train the
+    variant that cannot see LendingClub's own grade or rate.
+    """
+    features = list(features if features is not None else gbm_features(train_df))
     X_train = prepare_lgb_frame(train_df, features)
     X_valid = prepare_lgb_frame(valid_df, features)
 

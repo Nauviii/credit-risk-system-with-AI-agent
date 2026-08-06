@@ -9,16 +9,24 @@ import polars as pl
 from sklearn.linear_model import LogisticRegression
 
 from credit_risk.features.build_dataset import SCORECARD_FEATURES
-from credit_risk.features.woe import WOEEncoder
+from credit_risk.features.woe import WOEEncoder, DEFAULT_INITIAL_BINS
 
 
 def train_scorecard(
-    train_df: pl.DataFrame, target: str = "default_flag", n_bins: int = 10
+    train_df: pl.DataFrame,
+    features: list[str] | None = None,
+    target: str = "default_flag",
+    n_bins: int = DEFAULT_INITIAL_BINS,
 ) -> tuple[LogisticRegression, WOEEncoder]:
-    """Fit WOEEncoder on train, then fit LogisticRegression on the WOE-encoded features."""
-    encoder = WOEEncoder(features=SCORECARD_FEATURES, target=target, n_bins=n_bins).fit(train_df)
+    """Fit WOEEncoder on train, then fit LogisticRegression on the WOE-encoded features.
+
+    features defaults to SCORECARD_FEATURES; pass APPLICATION_FEATURES to train the
+    variant that excludes LendingClub's own grade and rate.
+    """
+    features = list(features if features is not None else SCORECARD_FEATURES)
+    encoder = WOEEncoder(features=features, target=target, n_bins=n_bins).fit(train_df)
     train_woe = encoder.transform(train_df)
-    woe_cols = [f"{f}_woe" for f in SCORECARD_FEATURES]
+    woe_cols = [f"{f}_woe" for f in features]
     X = train_woe.select(woe_cols).to_pandas()
     y = train_woe[target].to_pandas()
     model = LogisticRegression(max_iter=1000)

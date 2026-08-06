@@ -1,0 +1,13 @@
+feature,psi,band
+percent_bc_gt_75,0.08114617518582203,stable
+bc_open_to_buy,0.045291740134227175,stable
+acc_open_past_24mths,0.03134405205945892,stable
+mo_sin_old_rev_tl_op,0.027321109428634038,stable
+dti,0.0213115648471357,stable
+tot_hi_cred_lim,0.010912124149365258,stable
+annual_inc,0.010137144593008676,stable
+mths_since_recent_bc,0.008863975009763363,stable
+fico_range_low,0.007474868697480962,stable
+term_months,0.006092397398634451,stable
+mo_sin_rcnt_tl,0.005528779672633833,stable
+mths_since_recent_inq,0.0032709354567498536,stable

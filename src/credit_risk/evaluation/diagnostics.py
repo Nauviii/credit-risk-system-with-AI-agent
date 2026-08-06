@@ -8,7 +8,7 @@ features) so analysis and training stay independently runnable and reviewable.
 import pandas as pd
 import polars as pl
 from sklearn.linear_model import LogisticRegression
-from credit_risk.features.woe import WOEEncoder
+from credit_risk.features.woe import WOEEncoder, DEFAULT_INITIAL_BINS
 
 
 def coefficient_sign_report(model: LogisticRegression, features: list[str]) -> pd.DataFrame:
@@ -47,7 +47,8 @@ def multicollinearity_report(train_woe: pl.DataFrame, features: list[str], thres
 
 
 def drop_until_signs_are_clean(
-    features: list[str], train_df: pl.DataFrame, target: str = "default_flag", n_bins: int = 10, max_iterations: int = 10
+    features: list[str], train_df: pl.DataFrame, target: str = "default_flag",
+    n_bins: int = DEFAULT_INITIAL_BINS, max_iterations: int = 10
 ) -> tuple[list[str], "WOEEncoder", LogisticRegression]:
     """Iteratively refit and drop the worst positive-coefficient feature until none remain.
 

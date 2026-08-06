@@ -1,22 +1,47 @@
 random_seed: 42
+
 target:
-  matured_statuses: ["Fully Paid", "Charged Off", "Default"]
-  indeterminate_statuses: ["Current", "In Grace Period", "Late (16-30 days)", "Late (31-120 days)"]
+  # Fixed outcome window, not a maturity filter. Rationale and the measured censoring
+  # bias that forced the change are in data/target.py's module docstring.
+  definition: "fixed_horizon"
+  data_cutoff: "2018-12"
+  # H=24 is the largest horizon under which the 2016 vintage is still fully observable
+  # (2016-12 + 24m = 2018-12). Cost, from the default hazard curve on the fully matured
+  # 2012-2013 vintages: H=24 captures ~60% of eventual 36-month defaults and ~42% of
+  # 60-month ones. The under-count is identical across every split, so it shifts the
+  # level but not the comparison. Coverage at other horizons: H=30 -> 0.80/0.58 but the
+  # last observable vintage becomes 2016-06; H=36 -> 0.94/0.70 but drops 2016 entirely.
+  # Consequence to carry downstream: this is a 24-month PD, not a lifetime PD, so the
+  # expected-loss layer must use the same horizon. Term-36 and term-60 coverage differ
+  # enough that the target means different things per term - segment before comparing.
+  horizon_months: 24
+  # Lending Club charges off at ~121 days delinquent, so the charge-off month is the
+  # last scheduled payment plus ~5 months. Proxy validated on 2012-2013: median gap
+  # between months-to-last-payment and payments-actually-made is 0.00 (no recoveries)
+  # vs 0.01 (with recoveries), i.e. last_pymnt_d is not moved by collections.
+  # Sensitivity: from the hazard curve, +/-1 month here moves the 24-month default
+  # count by roughly 3%. Re-check if this value changes.
+  charge_off_lag_months: 5
+  bad_statuses: ["Charged Off", "Default"]
+
 split:
   strategy: "out_of_time"
   time_column: "issue_d"
-  # Cutoffs grounded in real censoring analysis (EDA phase 3, sample n=299,970):
-  # % loans still censored (Current/Late/Grace) by issue year:
-  # 2007-2013: 0% | 2014: 5.3% | 2015: 10.8% | 2016: 32.5% | 2017: 61.8% | 2018: 88.6%
-  # Recent vintages' "matured" subset is a biased sample (fast-resolving loans only),
-  # not representative - so 2016 is borderline and 2017-2018 are unusable as labels.
+  # train_start=2013-01 is a data-availability decision, not a preference.
+  # docs/vintage_feature_availability.csv (full data): 7 of the 16 SCORECARD_FEATURES
+  # (acc_open_past_24mths, mort_acc, mths_since_recent_bc, avg_cur_bal, bc_open_to_buy,
+  # num_rev_tl_bal_gt_0, mo_sin_rcnt_tl) are 100% null for 2007-2011 and 14-52% null in
+  # 2012, dropping below 5% only from 2013. Keeping those vintages puts 96,502 rows
+  # (21% of the old train set) into a WOE "missing" bin that encodes calendar time
+  # rather than credit risk, and that bin never fires at validation or serving time.
+  train_start: "2013-01"
   train_end: "2014-12"
-  # Validation carved out of the former train window (not random) - same OOT logic
-  # applied one level down, used only for GBM early stopping / hyperparameter choice.
+  # Time-based, not random: same OOT logic applied one level down. Used for GBM early
+  # stopping. Note it currently doubles as the Optuna objective - a known weakness.
   validation_start: "2015-01"
   validation_end: "2015-12"
   oot_test_start: "2016-01"
   oot_test_end: "2016-12"
-  # Excluded from label-based train/test (too immature to trust matured subset);
-  # reserved for feature-drift monitoring simulation in phase 9 instead.
+  # 2017-01 onward cannot reach 24 months of observation before the 2018-12 cutoff.
+  # Reserved for feature-drift monitoring simulation (phase 9), never for labels.
   monitoring_only_start: "2017-01"

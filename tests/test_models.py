@@ -50,3 +50,20 @@ def test_gbm_beats_chance_on_held_out_data():
     model, features = train_gbm(train, valid)
     pred = predict_gbm(model, features, test)
     assert auc(test["default_flag"].to_pandas(), pred) > 0.6
+
+def test_train_gbm_honours_an_explicit_feature_list():
+    """Passing features must restrict the model to exactly those columns."""
+    import numpy as np
+
+    from credit_risk.models.gbm import train_gbm
+
+    rng = np.random.default_rng(0)
+    n = 400
+    frame = pl.DataFrame({
+        "annual_inc": rng.normal(size=n),
+        "dti": rng.normal(size=n),
+        "issue_d": ["Jan-2013"] * n,
+        "default_flag": rng.integers(0, 2, n),
+    })
+    _, used = train_gbm(frame, frame, params={"learning_rate": 0.3}, features=["annual_inc"])
+    assert used == ["annual_inc"]
