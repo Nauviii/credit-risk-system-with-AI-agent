@@ -2,7 +2,13 @@
 # Keeps the shipped image small and removes the build tooling from the attack surface.
 FROM python:3.12-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /bin/uv
+# The uv in this image must be AT LEAST as new as the uv that wrote uv.lock. The lockfile
+# carries a `revision` field, and an older uv cannot read a newer revision - `uv sync
+# --frozen` then fails on a lockfile that is perfectly valid locally. Pin this to the
+# output of `uv --version` on the machine that maintains the lock; `latest` is the safe
+# default but gives up build reproducibility.
+ARG UV_VERSION=latest
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -13,6 +19,7 @@ WORKDIR /app
 # Dependencies are installed from the lockfile BEFORE the source is copied, so a source
 # change does not invalidate the dependency layer. --no-install-project skips the package
 # itself at this stage for the same reason.
+# The cache mount needs BuildKit; CI sets that up with docker/setup-buildx-action.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
@@ -45,5 +52,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 USER appuser
-    
+
+# No model artefacts are baked in - none are persisted yet (see PROJECT_HANDOFF section 8).
+# Phase 8 replaces this CMD with `uvicorn credit_risk.serving.app:app --host 0.0.0.0 --port 8000`
+# and mounts or copies the trained artefacts.
 CMD ["python", "-c", "import credit_risk; print('credit_risk image ready')"]

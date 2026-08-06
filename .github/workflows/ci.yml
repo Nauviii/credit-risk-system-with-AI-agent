@@ -51,6 +51,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Required, not optional. Without it build-push-action falls back to the default
+      # `docker` driver, which supports neither `cache-to: type=gha` nor the
+      # `RUN --mount=type=cache` lines in the Dockerfile - both need BuildKit.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build image
         uses: docker/build-push-action@v6
         with:
