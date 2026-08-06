@@ -108,3 +108,30 @@ def test_net_margin_falls_as_the_cutoff_loosens():
     ).sort("approval_rate")
     assert "net_margin_rate" in table.columns
     assert table["net_margin_rate"].to_list() == sorted(table["net_margin_rate"].to_list(), reverse=True)
+
+
+def test_total_margin_peaks_looser_than_the_margin_rate():
+    """Maximising margin per unit of exposure ignores volume and lands too tight."""
+    from credit_risk.evaluation.business import cutoff_table as ct
+
+    score, y, p = _book(n=40_000)
+    ead = np.full_like(score, 10_000.0)
+    table = ct(
+        score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85,
+        gross_yield=np.full_like(score, 0.25), n_points=20,
+    )
+    best_rate = table.sort("net_margin_rate", descending=True)["approval_rate"][0]
+    best_total = table.sort("net_margin_total", descending=True)["approval_rate"][0]
+    assert best_total >= best_rate
+
+
+def test_marginal_margin_turns_negative_before_the_average_does():
+    from credit_risk.evaluation.business import cutoff_table as ct
+
+    score, y, p = _book(n=40_000)
+    ead = np.full_like(score, 10_000.0)
+    table = ct(
+        score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85,
+        gross_yield=np.full_like(score, 0.25), n_points=20,
+    ).drop_nulls("marginal_margin_rate")
+    assert (table["marginal_margin_rate"] < table["net_margin_rate"]).any()

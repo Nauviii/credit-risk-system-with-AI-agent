@@ -2,9 +2,22 @@ __pycache__/
 *.pyc
 .venv/
 .env
+.pytest_cache/
+.ruff_cache/
+
+# MLflow local tracking store. `mlruns/` covered the deprecated file:// backend;
+# the current default is sqlite:///mlruns.db, which was being committed - a binary
+# that grows with every run and merges by conflict, not by union.
 mlruns/
+mlruns.db
+mlruns.db-journal
+mlartifacts/
+
+# Raw and intermediate data stay out of git; only the directory structure is tracked.
 data/raw/*
 data/interim/*
 data/processed/*
 !data/*/.gitkeep
-.pytest_cache/
+
+# Editor config belongs in .vscode/, and it holds machine-specific interpreter paths.
+/settings.json
