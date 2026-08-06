@@ -1,0 +1,70 @@
+name: CI
+
+# Runs on every push and pull request to main. Deliberately does NOT train a model:
+# the dataset is 2.26M rows and is not in the repo, so CI verifies that the code is
+# correct and consistent, not that the numbers reproduce. Reproducing the numbers is
+# what scripts/train_baseline.py is for, run locally against real data.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      # --frozen fails if uv.lock is out of date with pyproject.toml, which catches the
+      # common case of a dependency added locally but never locked.
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run black --check .
+
+      - name: Tests
+        run: uv run pytest tests/ -v --durations=10
+
+  # A separate job so a build failure is distinguishable from a test failure at a glance.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: credit-risk-system:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Proves the installed package is importable inside the image, which catches a
+      # Dockerfile that builds cleanly but ships a broken or empty package.
+      - name: Smoke test the image
+        run: |
+          docker run --rm credit-risk-system:ci python -c \
+            "from credit_risk.features.build_dataset import SCORECARD_FEATURES; \
+             print(f'package importable, {len(SCORECARD_FEATURES)} scorecard features')"

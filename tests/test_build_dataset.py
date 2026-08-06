@@ -57,3 +57,15 @@ def test_application_feature_set_carries_no_lender_derived_column():
     assert set(APPLICATION_FEATURES).isdisjoint(LENDER_DERIVED_COLUMNS)
     assert set(SCORECARD_FEATURES) & set(LENDER_DERIVED_COLUMNS) == {"sub_grade"}
     assert "term_months" in APPLICATION_FEATURES  # dropped from the full list as a suppressor
+
+
+def test_geographic_columns_never_reach_any_feature_list():
+    """Fair-lending exclusion: location is a proxy for protected characteristics."""
+    from credit_risk.data.schema import FAIR_LENDING_EXCLUDED_COLUMNS
+    from credit_risk.features.build_dataset import APPLICATION_FEATURES, application_features
+
+    df = pl.DataFrame({c: [0] for c in FAIR_LENDING_EXCLUDED_COLUMNS + ["annual_inc", "dti"]})
+    assert set(gbm_features(df)).isdisjoint(FAIR_LENDING_EXCLUDED_COLUMNS)
+    assert set(application_features(df)).isdisjoint(FAIR_LENDING_EXCLUDED_COLUMNS)
+    assert set(SCORECARD_FEATURES).isdisjoint(FAIR_LENDING_EXCLUDED_COLUMNS)
+    assert set(APPLICATION_FEATURES).isdisjoint(FAIR_LENDING_EXCLUDED_COLUMNS)

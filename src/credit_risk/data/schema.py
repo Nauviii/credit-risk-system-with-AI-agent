@@ -65,7 +65,26 @@ JOINT_APPLICATION_COLUMNS = [
 ]
 
 # Free text or near-unique identifiers - drop, or need dedicated encoding (not one-hot).
-HIGH_CARDINALITY_COLUMNS = ["emp_title", "desc", "title", "url", "zip_code"]
+HIGH_CARDINALITY_COLUMNS = ["emp_title", "desc", "title", "url"]
+
+# Geographic identifiers. Excluded on FAIR LENDING grounds, not on statistical ones - the
+# reason matters, because a column dropped for the wrong reason gets added back the moment
+# someone finds signal in it.
+#
+# Location is not itself a prohibited basis under ECOA / Regulation B, but it is a
+# well-established proxy for protected characteristics, and models using it have long been
+# subject to redlining and disparate-impact scrutiny. SHAP on the champion put addr_state
+# ninth by attribution (3.4%) despite an IV of 0.0135 that had already kept it out of the
+# scorecard - so the GBM was using it materially while the univariate screen said it was
+# uninformative. See docs/explainability_findings.md section 4.
+#
+# zip_code was previously excluded as HIGH_CARDINALITY_COLUMNS, which was accidental
+# compliance: correct outcome, wrong recorded reason. Moved here.
+#
+# This exclusion does NOT make the model neutral. Other retained features carry geographic
+# and socioeconomic signal indirectly. It is a first step, not a proof - deploying still
+# requires explicit disparate-impact testing.
+FAIR_LENDING_EXCLUDED_COLUMNS = ["addr_state", "zip_code"]
 
 # LendingClub only started collecting these bureau trade-line fields around 2015-2016.
 # Verified during EDA: 95-100% missing for issue_year <= 2015 (our train window),

@@ -46,10 +46,17 @@ same vintages. LendingClub's grading model improved over time, and any model con
 
 ## Results (OOT test, 2016)
 
-| | Full pool (74 features) | Application-only (70 features) |
+| | Full pool (73 features) | Application-only (69 features) |
 |---|---|---|
 | Linear (WOE + LR) | 0.7015 / Gini 0.4031 / KS 0.2913 | 0.6665 / Gini 0.3331 / KS 0.2390 |
-| GBM (tuned) | 0.7145 / Gini 0.4289 / KS 0.3132 | **0.6972 / Gini 0.3945 / KS 0.2871** |
+| GBM (tuned) | 0.7135 / Gini 0.4270 / KS 0.3104 | **0.6964 / Gini 0.3929 / KS 0.2824** |
+
+Pools are one column smaller than when the hyperparameters were tuned: `addr_state` was
+removed on fair-lending grounds after Phase 6 (`docs/explainability_findings.md` section 4).
+Cost 0.0008 AUC on the champion. The tuned parameters in `configs/gbm_best_params*.yaml` were
+fitted on the 74/70 pools and were deliberately **not** re-tuned for one dropped column —
+given that a sixfold change in regularization moved OOT by 0.0008, re-tuning for this is not
+a defensible use of compute.
 
 **Champion: GBM application-only.** The full-pool model is a benchmark, not a candidate —
 under the originator framing, `grade`/`sub_grade`/`int_rate`/`installment` are
@@ -57,10 +64,10 @@ LendingClub's own risk output and unavailable at decision time.
 
 Four readings from this 2×2:
 
-1. Application data alone **beats** LendingClub's grade (+0.0084 AUC over `sub_grade`),
+1. Application data alone **beats** LendingClub's grade (+0.0076 AUC over `sub_grade`),
    but only with a GBM. The linear scorecard cannot (−0.0223). What was missing was model
    capacity, not signal.
-2. LendingClub's grade and rate contribute **+0.0173 AUC** measured within the same model
+2. LendingClub's grade and rate contribute **+0.0171 AUC** measured within the same model
    class. The linear comparison (+0.0350) overstates the dependence by half.
 3. The GBM's advantage over the scorecard is +0.0122 with `sub_grade` present, +0.0294
    without it. Most of what the GBM adds is work `sub_grade` was already doing — it is

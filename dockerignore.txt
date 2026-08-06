@@ -1,0 +1,23 @@
+# Anything not needed to build the image. Keeping this tight matters more than usual here:
+# data/raw holds a 1.6 GB CSV that would otherwise be sent to the build daemon as context.
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
+data/
+mlruns/
+mlruns.db*
+mlartifacts/
+
+notebooks/
+docs/
+tests/
+scripts/
+
+.env
+*.md
+.vscode

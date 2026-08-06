@@ -34,6 +34,29 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 
+# Both tools are pinned explicitly rather than left on defaults, so CI and a developer's
+# machine cannot disagree because they resolved different minor versions.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",    # line length is black's job, and it disagrees with ruff at the margin
+    "B008",    # function call in default argument - intentional in a few signatures
+    "SIM108",  # ternary-instead-of-if is often less readable in numeric code
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests import inside functions on purpose, to keep optional heavy deps (shap, lightgbm)
+# out of collection when a single unrelated test file is run.
+"tests/*" = ["E402", "F401"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
