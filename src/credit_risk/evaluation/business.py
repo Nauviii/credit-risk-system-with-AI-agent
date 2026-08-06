@@ -47,14 +47,16 @@ def approval_curve(
         if approved.sum() == 0:
             continue
         declined = ~approved
-        rows.append({
-            "cutoff": float(cutoff),
-            "n_approved": int(approved.sum()),
-            "approval_rate": float(approved.mean()),
-            "bad_rate": float(y[approved].mean()),
-            "bad_rate_declined": float(y[declined].mean()) if declined.any() else None,
-            "exposure_approved": float(exposure[approved].sum()),
-        })
+        rows.append(
+            {
+                "cutoff": float(cutoff),
+                "n_approved": int(approved.sum()),
+                "approval_rate": float(approved.mean()),
+                "bad_rate": float(y[approved].mean()),
+                "bad_rate_declined": float(y[declined].mean()) if declined.any() else None,
+                "exposure_approved": float(exposure[approved].sum()),
+            }
+        )
     return pl.DataFrame(rows).sort("cutoff", descending=True)
 
 
@@ -68,8 +70,11 @@ def horizon_coverage(
     """
     return (
         df.filter(
-            pl.col("issue_d").cast(pl.Utf8).str.strptime(pl.Date, "%b-%Y", strict=False)
-            .dt.year().is_in(vintages)
+            pl.col("issue_d")
+            .cast(pl.Utf8)
+            .str.strptime(pl.Date, "%b-%Y", strict=False)
+            .dt.year()
+            .is_in(vintages)
             & (pl.col(_TARGET).is_not_null())
             & pl.col("mob_event").is_not_null()
         )
@@ -101,12 +106,12 @@ def empirical_lgd(df: pl.DataFrame) -> dict:
     """
     losses = (
         df.filter(pl.col("loan_status") == "Charged Off")
-        .with_columns(
-            (pl.col("loan_amnt") - pl.col("total_rec_prncp")).alias("outstanding")
-        )
+        .with_columns((pl.col("loan_amnt") - pl.col("total_rec_prncp")).alias("outstanding"))
         .filter(pl.col("outstanding") > 0)
         .with_columns(
-            (1 - pl.col("recoveries").fill_null(0.0) / pl.col("outstanding")).clip(0.0, 1.0).alias("lgd")
+            (1 - pl.col("recoveries").fill_null(0.0) / pl.col("outstanding"))
+            .clip(0.0, 1.0)
+            .alias("lgd")
         )
     )
     return {
@@ -184,7 +189,9 @@ def cutoff_table(
             income = float(
                 (gross_yield[approved] * (1 - pd_lifetime[approved]) * ead[approved]).sum()
             )
-            entry["gross_yield_rate"] = float((gross_yield[approved] * ead[approved]).sum() / exposure)
+            entry["gross_yield_rate"] = float(
+                (gross_yield[approved] * ead[approved]).sum() / exposure
+            )
             entry["net_margin_rate"] = (income - el) / exposure
         rows.append(entry)
 
@@ -194,8 +201,7 @@ def cutoff_table(
     return table.with_columns(
         (pl.col("net_margin_rate") * pl.col("exposure_approved")).alias("net_margin_total")
     ).with_columns(
-        (
-            pl.col("net_margin_total").diff()
-            / pl.col("exposure_approved").diff()
-        ).alias("marginal_margin_rate")
+        (pl.col("net_margin_total").diff() / pl.col("exposure_approved").diff()).alias(
+            "marginal_margin_rate"
+        )
     )

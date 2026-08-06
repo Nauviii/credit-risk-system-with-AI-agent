@@ -1,6 +1,7 @@
 """Load raw Lending Club CSV/CSV.GZ into a validated Polars DataFrame."""
 
 from pathlib import Path
+
 import polars as pl
 
 from credit_risk.data.schema import RAW_ACCEPTED_SCHEMA

@@ -51,7 +51,8 @@ def reliability_table(y: np.ndarray, p: np.ndarray, n_bins: int = 10) -> pl.Data
             "observed_rate": float(y[g].mean()),
             "gap": float(p[g].mean() - y[g].mean()),
         }
-        for i, g in enumerate(groups) if len(g) > 0
+        for i, g in enumerate(groups)
+        if len(g) > 0
     ]
     return pl.DataFrame(rows)
 
@@ -126,7 +127,8 @@ class Calibrator:
         if self.model_ is None:
             raise RuntimeError("Calibrator must be fitted before transform")
         raw = (
-            self.model_.predict(p) if self.method == "isotonic"
+            self.model_.predict(p)
+            if self.method == "isotonic"
             else self.model_.predict_proba(_logit(p).reshape(-1, 1))[:, 1]
         )
         return np.clip(raw, self.floor, self.cap)
@@ -150,7 +152,9 @@ def central_tendency_shift(p: np.ndarray, target_rate: float, tolerance: float =
     return (low + high) / 2
 
 
-def pd_to_score(p: np.ndarray, pdo: int = 20, base_score: int = 600, base_odds: float = 50.0) -> np.ndarray:
+def pd_to_score(
+    p: np.ndarray, pdo: int = 20, base_score: int = 600, base_odds: float = 50.0
+) -> np.ndarray:
     """Convert PD to scorecard points: Score = offset + factor * ln(odds of good).
 
     factor = pdo / ln(2), so every `pdo` points doubles the good:bad odds. Defaults put

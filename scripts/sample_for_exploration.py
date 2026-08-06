@@ -11,7 +11,9 @@ from credit_risk.data.ingestion import load_raw_accepted_loans
 def stratified_sample(df: pl.DataFrame, n: int, seed: int = 42) -> pl.DataFrame:
     """Sample n rows preserving loan_status x issue-year proportions so the subset stays representative."""
     df = df.with_columns(
-        (pl.col("loan_status") + "_" + pl.col("issue_d").str.split("-").list.last()).alias("_stratum")
+        (pl.col("loan_status") + "_" + pl.col("issue_d").str.split("-").list.last()).alias(
+            "_stratum"
+        )
     )
     frac = min(n / df.height, 1.0)
     parts = [group.sample(fraction=frac, seed=seed) for _, group in df.group_by("_stratum")]

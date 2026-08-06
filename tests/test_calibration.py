@@ -41,7 +41,9 @@ def test_brier_decomposition_reconstructs_the_score():
 def test_calibrator_fitted_on_one_sample_corrects_another():
     y_fit, p_fit = _well_calibrated(seed=1)
     y_apply, p_apply = _well_calibrated(seed=2)
-    inflate = lambda p: np.clip(p * 1.6, 0, 1)
+
+    def inflate(p):
+        return np.clip(p * 1.6, 0, 1)
 
     before = expected_calibration_error(y_apply, inflate(p_apply))
     for method in ("isotonic", "platt"):
@@ -68,7 +70,9 @@ def test_pdo_scaling_doubles_odds_every_pdo_points():
     low_risk, high_risk = pd_to_score(np.array([0.02])), pd_to_score(np.array([0.5]))
     assert low_risk[0] > high_risk[0]
     # 50:1 odds must land exactly on the base score by construction
-    assert pd_to_score(np.array([1 / 51]), pdo=20, base_score=600, base_odds=50.0)[0] == pytest.approx(600.0)
+    assert pd_to_score(np.array([1 / 51]), pdo=20, base_score=600, base_odds=50.0)[
+        0
+    ] == pytest.approx(600.0)
     # halving the good:bad odds must cost exactly one PDO
     assert pd_to_score(np.array([1 / 26]))[0] == pytest.approx(580.0, abs=1e-6)
 

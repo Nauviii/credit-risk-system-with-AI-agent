@@ -44,7 +44,7 @@ def _shares(values: pl.Series, edges: list[float], n_bins: int) -> np.ndarray:
     if (~null_mask).any():
         numeric = array[~null_mask].astype(float)
         index = np.searchsorted(np.asarray(edges), numeric, side="left")
-        counts[: n_bins] = np.bincount(index, minlength=n_bins)
+        counts[:n_bins] = np.bincount(index, minlength=n_bins)
     counts[n_bins] = null_mask.sum()
     total = counts.sum()
     return counts / total if total else counts
@@ -56,12 +56,14 @@ def psi_table(reference: pl.Series, actual: pl.Series, edges: list[float]) -> pl
     ref, act = _shares(reference, edges, n_bins), _shares(actual, edges, n_bins)
     ref_f, act_f = np.maximum(ref, _EPS), np.maximum(act, _EPS)
     labels = [f"<= {e}" for e in edges] + [f"> {edges[-1]}" if edges else "all"] + [_MISSING]
-    return pl.DataFrame({
-        "bin": labels,
-        "reference_share": ref,
-        "actual_share": act,
-        "psi_contribution": (act_f - ref_f) * np.log(act_f / ref_f),
-    })
+    return pl.DataFrame(
+        {
+            "bin": labels,
+            "reference_share": ref,
+            "actual_share": act,
+            "psi_contribution": (act_f - ref_f) * np.log(act_f / ref_f),
+        }
+    )
 
 
 def population_stability_index(
@@ -82,13 +84,23 @@ def psi_report(
             continue
         if not reference_df[feature].dtype.is_numeric():
             continue  # categorical stability needs share-by-level, not quantile bins
-        rows.append({
-            "feature": feature,
-            "psi": population_stability_index(reference_df[feature], actual_df[feature], n_bins),
-        })
-    return pl.DataFrame(rows).sort("psi", descending=True).with_columns(
-        pl.when(pl.col("psi") > 0.25).then(pl.lit("material shift"))
-        .when(pl.col("psi") > 0.10).then(pl.lit("watch"))
-        .otherwise(pl.lit("stable"))
-        .alias("band")
+        rows.append(
+            {
+                "feature": feature,
+                "psi": population_stability_index(
+                    reference_df[feature], actual_df[feature], n_bins
+                ),
+            }
+        )
+    return (
+        pl.DataFrame(rows)
+        .sort("psi", descending=True)
+        .with_columns(
+            pl.when(pl.col("psi") > 0.25)
+            .then(pl.lit("material shift"))
+            .when(pl.col("psi") > 0.10)
+            .then(pl.lit("watch"))
+            .otherwise(pl.lit("stable"))
+            .alias("band")
+        )
     )

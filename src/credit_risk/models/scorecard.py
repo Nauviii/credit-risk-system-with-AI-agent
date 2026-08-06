@@ -9,7 +9,7 @@ import polars as pl
 from sklearn.linear_model import LogisticRegression
 
 from credit_risk.features.build_dataset import SCORECARD_FEATURES
-from credit_risk.features.woe import WOEEncoder, DEFAULT_INITIAL_BINS
+from credit_risk.features.woe import DEFAULT_INITIAL_BINS, WOEEncoder
 
 
 def train_scorecard(
@@ -34,7 +34,9 @@ def train_scorecard(
     return model, encoder
 
 
-def predict_scorecard(model: LogisticRegression, encoder: WOEEncoder, df: pl.DataFrame) -> np.ndarray:
+def predict_scorecard(
+    model: LogisticRegression, encoder: WOEEncoder, df: pl.DataFrame
+) -> np.ndarray:
     """Score a dataframe with a fitted encoder+model pair - returns predicted P(default)."""
     transformed = encoder.transform(df)
     woe_cols = [f"{f}_woe" for f in encoder.features]

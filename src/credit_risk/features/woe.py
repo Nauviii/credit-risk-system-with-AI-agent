@@ -47,7 +47,9 @@ def _quantile_edges(values: pl.Series, n_bins: int) -> list[float]:
     return sorted(e for e in edges if e is not None)
 
 
-def _aggregate(indices: np.ndarray, target: np.ndarray, n_groups: int) -> tuple[np.ndarray, np.ndarray]:
+def _aggregate(
+    indices: np.ndarray, target: np.ndarray, n_groups: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Total and bad counts per ordered bin index."""
     n = np.bincount(indices, minlength=n_groups).astype(float)
     bad = np.bincount(indices, weights=target, minlength=n_groups).astype(float)
@@ -84,7 +86,7 @@ def _merge(n: np.ndarray, bad: np.ndarray, edges: list[float], i: int):
     """Merge bin i into bin i+1, dropping the edge between them."""
     n[i + 1] += n[i]
     bad[i + 1] += bad[i]
-    return np.delete(n, i), np.delete(bad, i), edges[:i] + edges[i + 1:]
+    return np.delete(n, i), np.delete(bad, i), edges[:i] + edges[i + 1 :]
 
 
 def monotone_edges(
@@ -135,7 +137,9 @@ def monotone_edges(
     return edges
 
 
-def _bin_expr(df: pl.DataFrame, feature: str, edges: list[float], rare: set[str] | None = None) -> pl.Expr:
+def _bin_expr(
+    df: pl.DataFrame, feature: str, edges: list[float], rare: set[str] | None = None
+) -> pl.Expr:
     """Map a feature to string bin labels using fixed edges (numeric) or its own values."""
     if df.schema[feature] in _NUMERIC_DTYPES:
         binned = pl.col(feature).cut(edges).cast(pl.Utf8) if edges else pl.lit("all")
@@ -164,9 +168,8 @@ def _neutralise_thin_special_bins(table: pl.DataFrame, min_bads: int) -> pl.Data
     was producing |WOE| 1.69, pure noise weighted like real signal. Neutral is the
     conservative reading: the bin exists, but the data cannot say which way it points.
     """
-    thin = (
-        pl.col("_bin").is_in([_MISSING, _RARE])
-        & ((pl.col("n_bad") < min_bads) | (pl.col("n_good") < min_bads))
+    thin = pl.col("_bin").is_in([_MISSING, _RARE]) & (
+        (pl.col("n_bad") < min_bads) | (pl.col("n_good") < min_bads)
     )
     return table.with_columns(
         pl.when(thin).then(pl.lit(0.0)).otherwise(pl.col("woe")).alias("woe"),
@@ -177,8 +180,12 @@ def _neutralise_thin_special_bins(table: pl.DataFrame, min_bads: int) -> pl.Data
 def _woe_from_counts(grouped: pl.DataFrame, total_good: int, total_bad: int) -> pl.DataFrame:
     """Haldane-Anscombe smoothed WOE and IV contribution; bounded even for empty cells."""
     return grouped.with_columns(
-        (((pl.col("n_good") + _SMOOTH) / (total_good + 2 * _SMOOTH))
-         / ((pl.col("n_bad") + _SMOOTH) / (total_bad + 2 * _SMOOTH))).log().alias("woe"),
+        (
+            ((pl.col("n_good") + _SMOOTH) / (total_good + 2 * _SMOOTH))
+            / ((pl.col("n_bad") + _SMOOTH) / (total_bad + 2 * _SMOOTH))
+        )
+        .log()
+        .alias("woe"),
         (pl.col("n_good") / total_good).alias("dist_good"),
         (pl.col("n_bad") / total_bad).alias("dist_bad"),
     ).with_columns(
@@ -196,10 +203,14 @@ def _rare_categories(df: pl.DataFrame, feature: str, target: str, min_bads: int)
     drove its IV to zero - below its own coarser parent, `grade`, which is impossible.
     What actually matters statistically is having enough of both classes in the cell.
     """
-    counts = df.group_by(feature).agg(
-        (pl.col(target) == 1).sum().alias("bad"),
-        (pl.col(target) == 0).sum().alias("good"),
-    ).filter((pl.col("bad") < min_bads) | (pl.col("good") < min_bads))
+    counts = (
+        df.group_by(feature)
+        .agg(
+            (pl.col(target) == 1).sum().alias("bad"),
+            (pl.col(target) == 0).sum().alias("good"),
+        )
+        .filter((pl.col("bad") < min_bads) | (pl.col("good") < min_bads))
+    )
     return {v for v in counts[feature].cast(pl.Utf8).to_list() if v is not None}
 
 
@@ -220,8 +231,11 @@ def woe_iv_table(
         non_null = working.filter(pl.col(feature).is_not_null())
         if non_null.height > 0:
             edges = monotone_edges(
-                non_null[feature], non_null[target].to_numpy().astype(float),
-                n_bins, min_bin_fraction, min_bin_bads,
+                non_null[feature],
+                non_null[target].to_numpy().astype(float),
+                n_bins,
+                min_bin_fraction,
+                min_bin_bads,
             )
     else:
         rare = _rare_categories(working, feature, target, min_bin_bads)
@@ -245,7 +259,9 @@ def woe_iv_table(
     )
 
 
-def information_value(df: pl.DataFrame, feature: str, target: str = "default_flag", **kwargs) -> float:
+def information_value(
+    df: pl.DataFrame, feature: str, target: str = "default_flag", **kwargs
+) -> float:
     """Total IV for a feature - the standard first-pass screening metric."""
     return float(woe_iv_table(df, feature, target, **kwargs)["iv_contribution"].sum())
 
@@ -262,13 +278,21 @@ def rank_features_by_iv(
             iv = None
             print(f"skipped {f}: {exc}")
         rows.append({"feature": f, "iv": iv})
-    return pl.DataFrame(rows).sort("iv", descending=True, nulls_last=True).with_columns(
-        pl.when(pl.col("iv") > 0.5).then(pl.lit("suspicious - check leakage"))
-        .when(pl.col("iv") > 0.3).then(pl.lit("strong"))
-        .when(pl.col("iv") > 0.1).then(pl.lit("medium"))
-        .when(pl.col("iv") > 0.02).then(pl.lit("weak"))
-        .otherwise(pl.lit("not useful"))
-        .alias("strength")
+    return (
+        pl.DataFrame(rows)
+        .sort("iv", descending=True, nulls_last=True)
+        .with_columns(
+            pl.when(pl.col("iv") > 0.5)
+            .then(pl.lit("suspicious - check leakage"))
+            .when(pl.col("iv") > 0.3)
+            .then(pl.lit("strong"))
+            .when(pl.col("iv") > 0.1)
+            .then(pl.lit("medium"))
+            .when(pl.col("iv") > 0.02)
+            .then(pl.lit("weak"))
+            .otherwise(pl.lit("not useful"))
+            .alias("strength")
+        )
     )
 
 
@@ -304,7 +328,9 @@ class WOEEncoder:
         self.bin_tables_: dict[str, pl.DataFrame] = {}
 
     def _bin_column(self, df: pl.DataFrame, feature: str) -> pl.Expr:
-        return _bin_expr(df, feature, self.bin_edges_.get(feature, []), self.rare_categories_.get(feature))
+        return _bin_expr(
+            df, feature, self.bin_edges_.get(feature, []), self.rare_categories_.get(feature)
+        )
 
     def fit(self, df: pl.DataFrame) -> "WOEEncoder":
         """Learn bin edges, rare-category pooling and per-bin WOE from df - train only."""
@@ -314,10 +340,17 @@ class WOEEncoder:
             working = base.select(feature, self.target)
             if working.schema[feature] in _NUMERIC_DTYPES:
                 non_null = working.filter(pl.col(feature).is_not_null())
-                self.bin_edges_[feature] = monotone_edges(
-                    non_null[feature], non_null[self.target].to_numpy().astype(float),
-                    self.n_bins, self.min_bin_fraction, self.min_bin_bads,
-                ) if non_null.height > 0 else []
+                self.bin_edges_[feature] = (
+                    monotone_edges(
+                        non_null[feature],
+                        non_null[self.target].to_numpy().astype(float),
+                        self.n_bins,
+                        self.min_bin_fraction,
+                        self.min_bin_bads,
+                    )
+                    if non_null.height > 0
+                    else []
+                )
             else:
                 self.rare_categories_[feature] = _rare_categories(
                     working, feature, self.target, self.min_bin_bads
@@ -332,16 +365,22 @@ class WOEEncoder:
                 (pl.col(self.target) == 0).sum().alias("n_good"),
                 (pl.col(self.target) == 1).sum().alias("n_bad"),
             )
-            table = _neutralise_thin_special_bins(
-                _woe_from_counts(
-                    grouped,
-                    int((binned[self.target] == 0).sum()),
-                    int((binned[self.target] == 1).sum()),
-                ),
-                self.min_bin_bads,
-            ).with_columns((pl.col("n_bad") / pl.col("n")).alias("bad_rate")).sort("_order", "_bin")
+            table = (
+                _neutralise_thin_special_bins(
+                    _woe_from_counts(
+                        grouped,
+                        int((binned[self.target] == 0).sum()),
+                        int((binned[self.target] == 1).sum()),
+                    ),
+                    self.min_bin_bads,
+                )
+                .with_columns((pl.col("n_bad") / pl.col("n")).alias("bad_rate"))
+                .sort("_order", "_bin")
+            )
             self.bin_tables_[feature] = table
-            self.woe_maps_[feature] = dict(zip(table["_bin"].cast(pl.Utf8), table["woe"]))
+            self.woe_maps_[feature] = dict(
+                zip(table["_bin"].cast(pl.Utf8), table["woe"], strict=True)
+            )
         return self
 
     def transform(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -372,22 +411,28 @@ class WOEEncoder:
             ordered = table.filter(pl.col("_order") >= 0).sort("_order")
             rates = ordered["bad_rate"].to_list()
             diffs = np.diff(rates) if len(rates) > 1 else np.array([0.0])
-            rows.append({
-                "feature": feature,
-                "is_numeric": is_numeric,
-                "n_bins": table.height,
-                "has_missing_bin": _MISSING in table["_bin"].to_list(),
-                "n_neutralised": int(table["neutralised"].sum()),
-                "min_bin_n": int(table["n"].min()),
-                "min_bin_bads": int(table["n_bad"].min()),
-                # only meaningful for numeric features: categories have no ordering
-                "is_monotone": bool((diffs >= 0).all() or (diffs <= 0).all()) if is_numeric else None,
-                "max_abs_woe": float(table["woe"].abs().max()),
-            })
+            rows.append(
+                {
+                    "feature": feature,
+                    "is_numeric": is_numeric,
+                    "n_bins": table.height,
+                    "has_missing_bin": _MISSING in table["_bin"].to_list(),
+                    "n_neutralised": int(table["neutralised"].sum()),
+                    "min_bin_n": int(table["n"].min()),
+                    "min_bin_bads": int(table["n_bad"].min()),
+                    # only meaningful for numeric features: categories have no ordering
+                    "is_monotone": (
+                        bool((diffs >= 0).all() or (diffs <= 0).all()) if is_numeric else None
+                    ),
+                    "max_abs_woe": float(table["woe"].abs().max()),
+                }
+            )
         return pl.DataFrame(rows).sort("feature")
 
 
-def prune_correlated_features(features_by_priority: list[str], corr: pd.DataFrame, threshold: float = 0.6) -> list[str]:
+def prune_correlated_features(
+    features_by_priority: list[str], corr: pd.DataFrame, threshold: float = 0.6
+) -> list[str]:
     """Greedily keep each feature (in priority order, e.g. IV descending) unless it
     correlates above threshold with an already-kept one - avoids near-duplicate
     features destabilizing a logistic regression (e.g. grade/sub_grade/int_rate)."""

@@ -17,12 +17,17 @@ import yaml
 from credit_risk.data.ingestion import load_raw_accepted_loans
 from credit_risk.data.target import build_target
 from credit_risk.evaluation.baselines import (
-    auc_by_segment, auc_by_vintage, reference_baseline_table,
+    auc_by_segment,
+    auc_by_vintage,
+    reference_baseline_table,
 )
 from credit_risk.evaluation.metrics import discrimination_report
 from credit_risk.features.build_dataset import (
-    assemble_feature_matrix, gbm_features, application_features,
-    SCORECARD_FEATURES, APPLICATION_FEATURES,
+    APPLICATION_FEATURES,
+    SCORECARD_FEATURES,
+    application_features,
+    assemble_feature_matrix,
+    gbm_features,
 )
 from credit_risk.models.gbm import predict_gbm, train_gbm
 from credit_risk.models.scorecard import predict_scorecard, train_scorecard
@@ -111,9 +116,13 @@ def main() -> None:
         ("Scorecard (full)", SCORECARD_FEATURES, "scorecard_full_v2"),
         ("Scorecard (application-only)", APPLICATION_FEATURES, "scorecard_application_v2"),
     ):
-        with start_run(run_name, {"model_type": "logistic_regression", "n_features": len(feature_set)}):
+        with start_run(
+            run_name, {"model_type": "logistic_regression", "n_features": len(feature_set)}
+        ):
             model, encoder = train_scorecard(splits["train"], features=feature_set)
-            _evaluate_and_log(label, splits, lambda d, m=model, e=encoder: predict_scorecard(m, e, d), floors)
+            _evaluate_and_log(
+                label, splits, lambda d, m=model, e=encoder: predict_scorecard(m, e, d), floors
+            )
 
     # Both pools, so the 2x2 (linear vs GBM) x (full vs application-only) grid is complete.
     # Without the application-only GBM, a weak application-only scorecard cannot be told
@@ -125,9 +134,14 @@ def main() -> None:
         tuned_params = _load_tuned_gbm_params(_TUNED_PARAMS_PATHS[label])
         gbm_params_source = "tuned" if tuned_params else "default (untuned)"
         print(f"\n{label} hyperparameters: {gbm_params_source}")
-        with start_run(run_name, {
-            "model_type": "lightgbm", "n_features": len(pool), "params_source": gbm_params_source,
-        }):
+        with start_run(
+            run_name,
+            {
+                "model_type": "lightgbm",
+                "n_features": len(pool),
+                "params_source": gbm_params_source,
+            },
+        ):
             gbm_model, features = train_gbm(
                 splits["train"], splits["validation"], params=tuned_params, features=pool
             )

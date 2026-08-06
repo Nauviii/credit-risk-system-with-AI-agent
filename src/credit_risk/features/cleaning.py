@@ -2,7 +2,7 @@
 
 import polars as pl
 
-from credit_risk.data.schema import SENTINEL_VALUES, WINSORIZE_CAPS, STRUCTURALLY_MISSING_COLUMNS
+from credit_risk.data.schema import SENTINEL_VALUES, STRUCTURALLY_MISSING_COLUMNS, WINSORIZE_CAPS
 
 
 def clean_sentinels(df: pl.DataFrame) -> pl.DataFrame:

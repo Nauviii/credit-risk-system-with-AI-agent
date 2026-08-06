@@ -36,8 +36,14 @@ def score_only_auc(df: pl.DataFrame, feature: str) -> dict:
     """
     subset = df.select(feature, _TARGET).drop_nulls()
     if subset.height == 0:
-        return {"feature": feature, "n": 0, "coverage": 0.0, "auc": None,
-                "raw_auc": None, "risk_increases_with_value": None}
+        return {
+            "feature": feature,
+            "n": 0,
+            "coverage": 0.0,
+            "auc": None,
+            "raw_auc": None,
+            "risk_increases_with_value": None,
+        }
 
     column = subset[feature]
     score = (column.rank("dense") if column.dtype == pl.Utf8 else column).to_numpy()
@@ -84,20 +90,28 @@ def auc_by_segment(df: pl.DataFrame, score: np.ndarray, segment: str) -> pl.Data
         for value in sorted(frame["_segment"].unique().drop_nulls().to_list())
         for part in [frame.filter(pl.col("_segment") == value)]
     ]
-    rows.append({
-        "segment": None,
-        "n": frame.height,
-        "default_rate": float(frame[_TARGET].mean()),
-        "auc": _auc(frame[_TARGET].to_numpy(), frame["score"].to_numpy()),
-    })
-    return pl.DataFrame(rows, schema={"segment": pl.Utf8, "n": pl.Int64,
-                                      "default_rate": pl.Float64, "auc": pl.Float64})
+    rows.append(
+        {
+            "segment": None,
+            "n": frame.height,
+            "default_rate": float(frame[_TARGET].mean()),
+            "auc": _auc(frame[_TARGET].to_numpy(), frame["score"].to_numpy()),
+        }
+    )
+    return pl.DataFrame(
+        rows,
+        schema={"segment": pl.Utf8, "n": pl.Int64, "default_rate": pl.Float64, "auc": pl.Float64},
+    )
 
 
 def auc_by_vintage(df: pl.DataFrame, score: np.ndarray) -> pl.DataFrame:
     """AUC and default rate per issue year, plus the pooled figure for comparison."""
     with_year = df.with_columns(
-        pl.col("issue_d").cast(pl.Utf8).str.strptime(pl.Date, "%b-%Y", strict=False)
-        .dt.year().cast(pl.Utf8).alias("_issue_year")
+        pl.col("issue_d")
+        .cast(pl.Utf8)
+        .str.strptime(pl.Date, "%b-%Y", strict=False)
+        .dt.year()
+        .cast(pl.Utf8)
+        .alias("_issue_year")
     )
     return auc_by_segment(with_year, score, "_issue_year").rename({"segment": "issue_year"})

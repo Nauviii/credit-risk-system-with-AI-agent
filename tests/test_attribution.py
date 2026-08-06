@@ -22,11 +22,13 @@ def fitted():
 
     rng = np.random.default_rng(0)
     n = 4_000
-    frame = pd.DataFrame({
-        "raises_risk": rng.normal(size=n),
-        "lowers_risk": rng.normal(size=n),
-        "noise": rng.normal(size=n),
-    })
+    frame = pd.DataFrame(
+        {
+            "raises_risk": rng.normal(size=n),
+            "lowers_risk": rng.normal(size=n),
+            "noise": rng.normal(size=n),
+        }
+    )
     logit = -2.0 + 1.5 * frame["raises_risk"] - 1.5 * frame["lowers_risk"]
     y = (rng.random(n) < 1 / (1 + np.exp(-logit))).astype(int)
     model = lgb.train(
@@ -49,7 +51,9 @@ def test_shap_importance_ranks_signal_above_noise(fitted):
 def test_direction_report_recovers_the_sign_of_each_driver(fitted):
     model, frame = fitted
     values, used = compute_shap_values(model, frame, sample_size=2_000)
-    direction = dict(zip(*shap_direction_report(values, used)[["feature", "raises_risk"]]))
+    direction = dict(
+        zip(*shap_direction_report(values, used)[["feature", "raises_risk"]], strict=True)
+    )
     assert direction["raises_risk"] is True
     assert direction["lowers_risk"] is False
 

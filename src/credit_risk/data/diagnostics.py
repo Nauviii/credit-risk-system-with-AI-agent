@@ -13,18 +13,17 @@ import polars as pl
 
 _BAD_STATUSES = ["Charged Off", "Default"]
 _CENSORED_STATUSES = [
-    "Current", "In Grace Period", "Late (16-30 days)", "Late (31-120 days)",
+    "Current",
+    "In Grace Period",
+    "Late (16-30 days)",
+    "Late (31-120 days)",
 ]
 _LEGACY_PREFIX = "Does not meet the credit policy. Status:"
 
 
 def _clean_status() -> pl.Expr:
     """Strip the legacy policy prefix so old vintages' statuses match the modern labels."""
-    return (
-        pl.col("loan_status")
-        .str.replace(_LEGACY_PREFIX, "", literal=True)
-        .str.strip_chars()
-    )
+    return pl.col("loan_status").str.replace(_LEGACY_PREFIX, "", literal=True).str.strip_chars()
 
 
 def _issue_date() -> pl.Expr:
@@ -58,9 +57,7 @@ def censoring_by_vintage(df: pl.DataFrame) -> pl.DataFrame:
             (pl.col("n_default") / pl.col("n_matured")).alias("dr_observed"),
             (pl.col("n_default") / pl.col("n_issued")).alias("dr_lower_bnd"),
         )
-        .with_columns(
-            (pl.col("dr_observed") - pl.col("dr_lower_bnd")).alias("bias_gap")
-        )
+        .with_columns((pl.col("dr_observed") - pl.col("dr_lower_bnd")).alias("bias_gap"))
         .sort("issue_year")
     )
 
@@ -89,9 +86,7 @@ def first_reliable_year(availability: pl.DataFrame, max_null_rate: float = 0.05)
     rows = [
         {
             "feature": f,
-            "first_year": (
-                availability.filter(pl.col(f) < max_null_rate)["issue_year"].min()
-            ),
+            "first_year": (availability.filter(pl.col(f) < max_null_rate)["issue_year"].min()),
         }
         for f in features
     ]
@@ -100,9 +95,7 @@ def first_reliable_year(availability: pl.DataFrame, max_null_rate: float = 0.05)
     )
 
 
-def default_hazard_by_mob(
-    df: pl.DataFrame, vintages: list[int], co_lag: int = 5
-) -> pl.DataFrame:
+def default_hazard_by_mob(df: pl.DataFrame, vintages: list[int], co_lag: int = 5) -> pl.DataFrame:
     """Cumulative share of a vintage's defaults resolved by month-on-book, per term.
 
     Run on fully matured vintages only. Read off the MOB where cum_share reaches
@@ -157,10 +150,9 @@ def prepayment_risk_link(
             & pl.col("d1").is_not_null()
         )
         .with_columns(
-            (
-                (_months("d1") - _months("d0"))
-                < (pl.col("term_months") - early_margin)
-            ).alias("early_payer")
+            ((_months("d1") - _months("d0")) < (pl.col("term_months") - early_margin)).alias(
+                "early_payer"
+            )
         )
         .group_by("term_months", "early_payer")
         .agg(
@@ -207,9 +199,7 @@ def charge_off_proxy_check(df: pl.DataFrame, vintages: list[int]) -> pl.DataFram
             ).alias("n_pymt_implied"),
             (pl.col("recoveries").fill_null(0.0) > 0).alias("has_recovery"),
         )
-        .with_columns(
-            (pl.col("mob_last_pymnt") - pl.col("n_pymt_implied")).alias("gap")
-        )
+        .with_columns((pl.col("mob_last_pymnt") - pl.col("n_pymt_implied")).alias("gap"))
         .group_by("has_recovery")
         .agg(
             pl.len().alias("n"),

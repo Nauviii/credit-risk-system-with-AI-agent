@@ -32,15 +32,22 @@ def train_gbm(
     X_valid = prepare_lgb_frame(valid_df, features)
 
     default_params = {
-        "objective": "binary", "metric": "auc", "learning_rate": 0.05,
-        "num_leaves": 31, "verbosity": -1, "seed": 42,
+        "objective": "binary",
+        "metric": "auc",
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "verbosity": -1,
+        "seed": 42,
     }
     train_set = lgb.Dataset(X_train, label=train_df[target].to_pandas())
     valid_set = lgb.Dataset(X_valid, label=valid_df[target].to_pandas(), reference=train_set)
 
     model = lgb.train(
-        {**default_params, **(params or {})}, train_set, num_boost_round=2000,
-        valid_sets=[valid_set], callbacks=[lgb.early_stopping(50), lgb.log_evaluation(0)],
+        {**default_params, **(params or {})},
+        train_set,
+        num_boost_round=2000,
+        valid_sets=[valid_set],
+        callbacks=[lgb.early_stopping(50), lgb.log_evaluation(0)],
     )
     return model, features
 

@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import polars as pl
+
 from credit_risk.features.woe import information_value, rank_features_by_iv
 
 
@@ -31,21 +32,26 @@ def test_rank_features_labels_noise_as_not_useful():
 def _train_test_with_shift():
     """Train/test pair with a distribution shift, mimicking a real OOT scenario."""
     rng = np.random.default_rng(0)
-    train = pl.DataFrame({
-        "num_feat": rng.normal(50, 10, 3000),
-        "cat_feat": rng.choice(["A", "B", "C"], 3000),
-        "default_flag": rng.binomial(1, 0.2, 3000),
-    })
-    test = pl.DataFrame({
-        "num_feat": rng.normal(70, 10, 1000),  # shifted mean, like OOT test
-        "cat_feat": rng.choice(["A", "B", "D"], 1000),  # D unseen in train
-        "default_flag": rng.binomial(1, 0.2, 1000),
-    })
+    train = pl.DataFrame(
+        {
+            "num_feat": rng.normal(50, 10, 3000),
+            "cat_feat": rng.choice(["A", "B", "C"], 3000),
+            "default_flag": rng.binomial(1, 0.2, 3000),
+        }
+    )
+    test = pl.DataFrame(
+        {
+            "num_feat": rng.normal(70, 10, 1000),  # shifted mean, like OOT test
+            "cat_feat": rng.choice(["A", "B", "D"], 1000),  # D unseen in train
+            "default_flag": rng.binomial(1, 0.2, 1000),
+        }
+    )
     return train, test
 
 
 def test_woe_encoder_reuses_train_bins_on_test():
     from credit_risk.features.woe import WOEEncoder
+
     train, test = _train_test_with_shift()
     enc = WOEEncoder(features=["num_feat"], n_bins=5).fit(train)
     train_woe = set(enc.transform(train)["num_feat_woe"].unique().to_list())
@@ -55,6 +61,7 @@ def test_woe_encoder_reuses_train_bins_on_test():
 
 def test_woe_encoder_unseen_category_falls_back_to_zero():
     from credit_risk.features.woe import WOEEncoder
+
     train, test = _train_test_with_shift()
     enc = WOEEncoder(features=["cat_feat"], n_bins=5).fit(train)
     result = enc.transform(test)
@@ -64,10 +71,12 @@ def test_woe_encoder_unseen_category_falls_back_to_zero():
 
 def test_prune_correlated_features_keeps_higher_priority_of_a_duplicate_pair():
     from credit_risk.features.woe import prune_correlated_features
+
     # 'a' and 'b' are near-duplicates (like grade/int_rate); 'c' is independent
     corr = pd.DataFrame(
         [[1.0, 0.95, 0.1], [0.95, 1.0, 0.1], [0.1, 0.1, 1.0]],
-        columns=["a", "b", "c"], index=["a", "b", "c"],
+        columns=["a", "b", "c"],
+        index=["a", "b", "c"],
     )
     kept = prune_correlated_features(["a", "b", "c"], corr, threshold=0.6)
     assert kept == ["a", "c"]
@@ -75,6 +84,7 @@ def test_prune_correlated_features_keeps_higher_priority_of_a_duplicate_pair():
 
 def test_drop_until_signs_are_clean_removes_redundant_feature_and_converges():
     from credit_risk.evaluation.diagnostics import drop_until_signs_are_clean
+
     rng = np.random.default_rng(0)
     n = 3000
     x1 = rng.uniform(0, 100, n)
@@ -83,9 +93,10 @@ def test_drop_until_signs_are_clean_removes_redundant_feature_and_converges():
     df = pl.DataFrame({"x1": x1, "x2": x2, "default_flag": y})
 
     kept, encoder, model = drop_until_signs_are_clean(["x1", "x2"], df)
-    coefs = dict(zip(kept, model.coef_[0]))
+    coefs = dict(zip(kept, model.coef_[0], strict=True))
     assert all(c < 0 for c in coefs.values())
     assert len(kept) <= 2
+
 
 def test_zero_bad_bin_woe_is_bounded_by_sample_size_not_by_an_epsilon():
     """A zero-bad bin must land at ln(2*n_bad), not at ln(1/eps).
@@ -96,10 +107,12 @@ def test_zero_bad_bin_woe_is_bounded_by_sample_size_not_by_an_epsilon():
     """
     from credit_risk.features.woe import WOEEncoder
 
-    df = pl.DataFrame({
-        "x": [0.0] * 500 + [1.0] * 500,
-        "default_flag": [0] * 500 + [0] * 250 + [1] * 250,
-    })
+    df = pl.DataFrame(
+        {
+            "x": [0.0] * 500 + [1.0] * 500,
+            "default_flag": [0] * 500 + [0] * 250 + [1] * 250,
+        }
+    )
     worst = max(abs(v) for v in WOEEncoder(["x"], min_bin_bads=1).fit(df).woe_maps_["x"].values())
     legacy = np.log((500 / 750) / 1e-6)  # what the old proportion-level epsilon produced
     assert worst < legacy / 2
@@ -142,10 +155,12 @@ def test_rare_categories_are_pooled_by_class_counts_and_frozen_for_transform():
     """Pooling is keyed on bad/good counts, not population share."""
     from credit_risk.features.woe import WOEEncoder
 
-    df = pl.DataFrame({
-        "state": ["A"] * 500 + ["B"] * 500 + ["Y"] * 40 + ["Z"] * 40,
-        "default_flag": ([0, 1] * 250) + ([0, 1] * 250) + ([0, 1] * 20) + ([0, 1] * 20),
-    })
+    df = pl.DataFrame(
+        {
+            "state": ["A"] * 500 + ["B"] * 500 + ["Y"] * 40 + ["Z"] * 40,
+            "default_flag": ([0, 1] * 250) + ([0, 1] * 250) + ([0, 1] * 20) + ([0, 1] * 20),
+        }
+    )
     encoder = WOEEncoder(["state"]).fit(df)
     assert encoder.rare_categories_["state"] == {"Y", "Z"}
 
@@ -169,11 +184,13 @@ def test_many_level_ordinal_survives_pooling():
     level = rng.integers(0, 35, n)
     labels = np.array([f"{chr(65 + i // 5)}{i % 5 + 1}" for i in range(35)])
     sub_grade = labels[level]
-    df = pl.DataFrame({
-        "sub_grade": sub_grade,
-        "grade": np.array([s[0] for s in sub_grade]),
-        "default_flag": (rng.random(n) < np.clip(0.02 + 0.007 * level, 0, 0.6)).astype(int),
-    })
+    df = pl.DataFrame(
+        {
+            "sub_grade": sub_grade,
+            "grade": np.array([s[0] for s in sub_grade]),
+            "default_flag": (rng.random(n) < np.clip(0.02 + 0.007 * level, 0, 0.6)).astype(int),
+        }
+    )
     assert len(WOEEncoder(["sub_grade"]).fit(df).woe_maps_["sub_grade"]) >= 30
     assert information_value(df, "sub_grade") > information_value(df, "grade")
 

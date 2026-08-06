@@ -47,12 +47,14 @@ def test_lifetime_scaling_raises_pd_more_for_lower_coverage():
 
 
 def test_empirical_lgd_ignores_fully_repaid_principal():
-    df = pl.DataFrame({
-        "loan_status": ["Charged Off", "Charged Off", "Fully Paid"],
-        "loan_amnt": [10_000.0, 10_000.0, 10_000.0],
-        "total_rec_prncp": [2_000.0, 10_000.0, 10_000.0],  # second has nothing outstanding
-        "recoveries": [800.0, 0.0, 0.0],
-    })
+    df = pl.DataFrame(
+        {
+            "loan_status": ["Charged Off", "Charged Off", "Fully Paid"],
+            "loan_amnt": [10_000.0, 10_000.0, 10_000.0],
+            "total_rec_prncp": [2_000.0, 10_000.0, 10_000.0],  # second has nothing outstanding
+            "recoveries": [800.0, 0.0, 0.0],
+        }
+    )
     result = empirical_lgd(df)
     assert result["n"] == 1
     assert result["lgd_mean"] == pytest.approx(1 - 800 / 8_000)
@@ -63,7 +65,9 @@ def test_cutoff_table_expected_loss_falls_as_the_cutoff_tightens():
     ead = np.full_like(score, 10_000.0)
     table = cutoff_table(score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85)
     ordered = table.sort("approval_rate")
-    assert ordered["expected_loss_rate"].to_list() == sorted(ordered["expected_loss_rate"].to_list())
+    assert ordered["expected_loss_rate"].to_list() == sorted(
+        ordered["expected_loss_rate"].to_list()
+    )
     assert (ordered["expected_loss"].diff().drop_nulls() > 0).all()
 
 
@@ -72,12 +76,14 @@ def test_horizon_coverage_reads_term_months_from_a_cleaned_frame():
     from credit_risk.evaluation.business import horizon_coverage
     from credit_risk.features.cleaning import parse_term_months
 
-    labeled = pl.DataFrame({
-        "issue_d": ["Jan-2013"] * 4,
-        "term": [" 36 months", " 36 months", " 60 months", " 60 months"],
-        "default_flag": [1, 0, 1, 0],
-        "mob_event": [12.0, 40.0, 20.0, 40.0],
-    })
+    labeled = pl.DataFrame(
+        {
+            "issue_d": ["Jan-2013"] * 4,
+            "term": [" 36 months", " 36 months", " 60 months", " 60 months"],
+            "default_flag": [1, 0, 1, 0],
+            "mob_event": [12.0, 40.0, 20.0, 40.0],
+        }
+    )
     assert "term_months" not in labeled.columns
     coverage = horizon_coverage(parse_term_months(labeled), horizon=24, vintages=[2013])
     assert coverage["term_months"].to_list() == [36, 60]
@@ -87,11 +93,13 @@ def test_horizon_coverage_reads_term_months_from_a_cleaned_frame():
 def test_scheduled_gross_yield_matches_the_loan_terms():
     from credit_risk.evaluation.business import scheduled_gross_yield
 
-    df = pl.DataFrame({
-        "installment": [333.0, 200.0],
-        "term_months": [36, 60],
-        "loan_amnt": [10_000.0, 10_000.0],
-    })
+    df = pl.DataFrame(
+        {
+            "installment": [333.0, 200.0],
+            "term_months": [36, 60],
+            "loan_amnt": [10_000.0, 10_000.0],
+        }
+    )
     yields = scheduled_gross_yield(df)
     assert yields[0] == pytest.approx((333.0 * 36 - 10_000) / 10_000)
     assert yields[1] > yields[0]  # longer term collects more interest on the same principal
@@ -103,11 +111,17 @@ def test_net_margin_falls_as_the_cutoff_loosens():
     score, y, p = _book()
     ead = np.full_like(score, 10_000.0)
     table = ct(
-        score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85,
+        score,
+        y,
+        to_lifetime_pd(p, np.full_like(p, 0.6)),
+        ead,
+        lgd=0.85,
         gross_yield=np.full_like(score, 0.25),
     ).sort("approval_rate")
     assert "net_margin_rate" in table.columns
-    assert table["net_margin_rate"].to_list() == sorted(table["net_margin_rate"].to_list(), reverse=True)
+    assert table["net_margin_rate"].to_list() == sorted(
+        table["net_margin_rate"].to_list(), reverse=True
+    )
 
 
 def test_total_margin_peaks_looser_than_the_margin_rate():
@@ -117,8 +131,13 @@ def test_total_margin_peaks_looser_than_the_margin_rate():
     score, y, p = _book(n=40_000)
     ead = np.full_like(score, 10_000.0)
     table = ct(
-        score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85,
-        gross_yield=np.full_like(score, 0.25), n_points=20,
+        score,
+        y,
+        to_lifetime_pd(p, np.full_like(p, 0.6)),
+        ead,
+        lgd=0.85,
+        gross_yield=np.full_like(score, 0.25),
+        n_points=20,
     )
     best_rate = table.sort("net_margin_rate", descending=True)["approval_rate"][0]
     best_total = table.sort("net_margin_total", descending=True)["approval_rate"][0]
@@ -131,7 +150,12 @@ def test_marginal_margin_turns_negative_before_the_average_does():
     score, y, p = _book(n=40_000)
     ead = np.full_like(score, 10_000.0)
     table = ct(
-        score, y, to_lifetime_pd(p, np.full_like(p, 0.6)), ead, lgd=0.85,
-        gross_yield=np.full_like(score, 0.25), n_points=20,
+        score,
+        y,
+        to_lifetime_pd(p, np.full_like(p, 0.6)),
+        ead,
+        lgd=0.85,
+        gross_yield=np.full_like(score, 0.25),
+        n_points=20,
     ).drop_nulls("marginal_margin_rate")
     assert (table["marginal_margin_rate"] < table["net_margin_rate"]).any()

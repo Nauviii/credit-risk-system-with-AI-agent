@@ -1,9 +1,13 @@
 """Tests for cleaning.py - each test locks in one decision from docs/eda_findings.md."""
 
 import polars as pl
+
 from credit_risk.features.cleaning import (
-    clean_sentinels, winsorize, parse_term_months,
-    derive_credit_history_months, add_has_history_flags,
+    add_has_history_flags,
+    clean_sentinels,
+    derive_credit_history_months,
+    parse_term_months,
+    winsorize,
 )
 
 

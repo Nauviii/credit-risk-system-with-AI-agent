@@ -37,7 +37,9 @@ from credit_risk.data.target import build_target
 from credit_risk.evaluation.baselines import score_only_auc
 from credit_risk.evaluation.metrics import discrimination_report
 from credit_risk.features.build_dataset import (
-    application_features, assemble_feature_matrix, gbm_features,
+    application_features,
+    assemble_feature_matrix,
+    gbm_features,
 )
 from credit_risk.models.gbm import predict_gbm, prepare_lgb_frame, train_gbm
 from credit_risk.tracking import start_run
@@ -62,7 +64,10 @@ def _split_inner(train: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
 def _objective(trial, sets: dict, n_bad: int) -> float:
     """One trial: early-stop on the inner slice, score on 2015. Returns 2015 AUC."""
     params = {
-        "objective": "binary", "metric": "auc", "verbosity": -1, "seed": 42,
+        "objective": "binary",
+        "metric": "auc",
+        "verbosity": -1,
+        "seed": 42,
         "num_leaves": trial.suggest_int("num_leaves", 8, 128, log=True),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
         # expressed as a share of the BAD count, not the row count: a leaf needs enough
@@ -78,12 +83,18 @@ def _objective(trial, sets: dict, n_bad: int) -> float:
         "min_gain_to_split": trial.suggest_float("min_gain_to_split", 0.0, 1.0),
     }
     inner_train = lgb.Dataset(sets["X_inner_train"], label=sets["y_inner_train"])
-    inner_valid = lgb.Dataset(sets["X_inner_valid"], label=sets["y_inner_valid"], reference=inner_train)
+    inner_valid = lgb.Dataset(
+        sets["X_inner_valid"], label=sets["y_inner_valid"], reference=inner_train
+    )
 
     model = lgb.train(
-        params, inner_train, num_boost_round=_NUM_BOOST_ROUND, valid_sets=[inner_valid],
+        params,
+        inner_train,
+        num_boost_round=_NUM_BOOST_ROUND,
+        valid_sets=[inner_valid],
         callbacks=[
-            lgb.early_stopping(50, verbose=False), lgb.log_evaluation(0),
+            lgb.early_stopping(50, verbose=False),
+            lgb.log_evaluation(0),
             LightGBMPruningCallback(trial, "auc", valid_name="valid_0"),
         ],
     )
@@ -108,8 +119,10 @@ def main() -> None:
     features = gbm_features(final) if args.pool == "full" else application_features(final)
     inner_train, inner_valid = _split_inner(train)
     n_bad = int(train["default_flag"].sum())
-    print(f"pool={args.pool} ({len(features)} features)  inner_train={inner_train.height} "
-          f"inner_valid={inner_valid.height}  train_bads={n_bad}")
+    print(
+        f"pool={args.pool} ({len(features)} features)  inner_train={inner_train.height} "
+        f"inner_valid={inner_valid.height}  train_bads={n_bad}"
+    )
 
     sets = {
         "X_inner_train": prepare_lgb_frame(inner_train, features),
@@ -130,9 +143,17 @@ def main() -> None:
 
         # Retrain under the protocol train_baseline.py uses, then report against the
         # sub_grade floor. Raw AUC is not comparable across splits; lift is.
-        best_params = {"objective": "binary", "metric": "auc", "verbosity": -1, "seed": 42, **study.best_params}
+        best_params = {
+            "objective": "binary",
+            "metric": "auc",
+            "verbosity": -1,
+            "seed": 42,
+            **study.best_params,
+        }
         model, _ = train_gbm(train, valid, params=best_params, features=features)
-        print(f"\n=== Tuned GBM ({args.pool}) ===  best_iteration={model.best_iteration}/{_NUM_BOOST_ROUND}")
+        print(
+            f"\n=== Tuned GBM ({args.pool}) ===  best_iteration={model.best_iteration}/{_NUM_BOOST_ROUND}"
+        )
         lifts = {}
         for name, split_df in [("train", train), ("validation", valid), ("oot_test", oot)]:
             metrics = discrimination_report(

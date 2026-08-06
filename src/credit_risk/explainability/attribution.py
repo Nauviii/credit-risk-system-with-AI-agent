@@ -23,7 +23,9 @@ from scipy.stats import spearmanr
 _SAMPLE_SIZE = 20_000
 
 
-def compute_shap_values(model, frame: pd.DataFrame, sample_size: int = _SAMPLE_SIZE, seed: int = 42):
+def compute_shap_values(
+    model, frame: pd.DataFrame, sample_size: int = _SAMPLE_SIZE, seed: int = 42
+):
     """TreeExplainer SHAP values on a random subsample, returned with the rows used.
 
     Subsampled because exact tree SHAP is O(rows); 20k is ample for a global ranking and the
@@ -43,9 +45,11 @@ def compute_shap_values(model, frame: pd.DataFrame, sample_size: int = _SAMPLE_S
 def shap_global_importance(values: np.ndarray, frame: pd.DataFrame) -> pl.DataFrame:
     """Mean |SHAP| per feature, plus its share of total attribution."""
     mean_abs = np.abs(values).mean(axis=0)
-    return pl.DataFrame({"feature": list(frame.columns), "mean_abs_shap": mean_abs}).with_columns(
-        (pl.col("mean_abs_shap") / pl.col("mean_abs_shap").sum()).alias("share")
-    ).sort("mean_abs_shap", descending=True)
+    return (
+        pl.DataFrame({"feature": list(frame.columns), "mean_abs_shap": mean_abs})
+        .with_columns((pl.col("mean_abs_shap") / pl.col("mean_abs_shap").sum()).alias("share"))
+        .sort("mean_abs_shap", descending=True)
+    )
 
 
 def shap_direction_report(values: np.ndarray, frame: pd.DataFrame) -> pl.DataFrame:
@@ -83,7 +87,10 @@ def rank_agreement(left: pl.DataFrame, right: pl.DataFrame, key: str = "feature"
     shared = left.select(key).join(right.select(key), on=key, how="inner")[key].to_list()
     if len(shared) < 3:
         return {"n_shared": len(shared), "spearman": None}
-    rank = lambda df: {f: i for i, f in enumerate(df[key].to_list()) if f in shared}
+
+    def rank(df: pl.DataFrame) -> dict:
+        return {f: i for i, f in enumerate(df[key].to_list()) if f in shared}
+
     a, b = rank(left), rank(right)
     order = sorted(shared)
     return {
@@ -117,21 +124,23 @@ def scorecard_points(
     offset = base_score - factor * np.log(base_odds)
     intercept = float(model.intercept_[0])
     base_per_feature = (offset - factor * intercept) / len(features)
-    coefficients = dict(zip(features, model.coef_[0]))
+    coefficients = dict(zip(features, model.coef_[0], strict=True))
 
     rows = []
     for feature in features:
         table = encoder.bin_tables_[feature]
         for record in table.to_dicts():
-            rows.append({
-                "feature": feature,
-                "bin": record["_bin"],
-                "n": record["n"],
-                "bad_rate": record["bad_rate"],
-                "woe": record["woe"],
-                "coefficient": coefficients[feature],
-                "points": -factor * coefficients[feature] * record["woe"] + base_per_feature,
-            })
+            rows.append(
+                {
+                    "feature": feature,
+                    "bin": record["_bin"],
+                    "n": record["n"],
+                    "bad_rate": record["bad_rate"],
+                    "woe": record["woe"],
+                    "coefficient": coefficients[feature],
+                    "points": -factor * coefficients[feature] * record["woe"] + base_per_feature,
+                }
+            )
     return pl.DataFrame(rows).with_columns(pl.col("points").round(1))
 
 

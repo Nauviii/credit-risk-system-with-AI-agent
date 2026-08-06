@@ -13,10 +13,16 @@ import polars as pl
 import yaml
 
 from credit_risk.data.schema import (
-    LEAKAGE_COLUMNS, EXCLUDED_VINTAGE_COLUMNS, HIGH_CARDINALITY_COLUMNS,
+    ALWAYS_MISSING_COLUMNS,
+    EXCLUDED_VINTAGE_COLUMNS,
     FAIR_LENDING_EXCLUDED_COLUMNS,
-    ALWAYS_MISSING_COLUMNS, JOINT_APPLICATION_COLUMNS, REDUNDANT_OR_CONSTANT_COLUMNS,
-    PLATFORM_COLUMNS, TARGET_TIMING_COLUMNS, LENDER_DERIVED_COLUMNS,
+    HIGH_CARDINALITY_COLUMNS,
+    JOINT_APPLICATION_COLUMNS,
+    LEAKAGE_COLUMNS,
+    LENDER_DERIVED_COLUMNS,
+    PLATFORM_COLUMNS,
+    REDUNDANT_OR_CONSTANT_COLUMNS,
+    TARGET_TIMING_COLUMNS,
 )
 from credit_risk.features.cleaning import clean_features
 
@@ -35,30 +41,57 @@ _NON_FEATURE_COLUMNS = ["id", "loan_status", "issue_d", "issue_date"]
 # between the two lists is a direct measurement of how much of this scorecard is really
 # LendingClub's scorecard.
 SCORECARD_FEATURES = [
-    "sub_grade", "fico_range_low", "acc_open_past_24mths", "annual_inc", "dti",
-    "tot_hi_cred_lim", "mo_sin_rcnt_tl", "mths_since_recent_inq", "mo_sin_old_rev_tl_op",
-    "mths_since_recent_bc", "home_ownership", "purpose", "percent_bc_gt_75",
+    "sub_grade",
+    "fico_range_low",
+    "acc_open_past_24mths",
+    "annual_inc",
+    "dti",
+    "tot_hi_cred_lim",
+    "mo_sin_rcnt_tl",
+    "mths_since_recent_inq",
+    "mo_sin_old_rev_tl_op",
+    "mths_since_recent_bc",
+    "home_ownership",
+    "purpose",
+    "percent_bc_gt_75",
     "verification_status",
 ]
 
 # Same pipeline, lender-derived columns removed. This is the set whose performance
 # transfers to production, since a lender scoring its own applicants has no sub_grade.
 APPLICATION_FEATURES = [
-    "fico_range_low", "acc_open_past_24mths", "annual_inc", "dti", "bc_open_to_buy",
-    "tot_hi_cred_lim", "mo_sin_rcnt_tl", "mths_since_recent_inq", "term_months",
-    "mo_sin_old_rev_tl_op", "mths_since_recent_bc", "home_ownership", "purpose",
-    "percent_bc_gt_75", "verification_status",
+    "fico_range_low",
+    "acc_open_past_24mths",
+    "annual_inc",
+    "dti",
+    "bc_open_to_buy",
+    "tot_hi_cred_lim",
+    "mo_sin_rcnt_tl",
+    "mths_since_recent_inq",
+    "term_months",
+    "mo_sin_old_rev_tl_op",
+    "mths_since_recent_bc",
+    "home_ownership",
+    "purpose",
+    "percent_bc_gt_75",
+    "verification_status",
 ]
 
 
 def _excluded_columns() -> set[str]:
     """Every column that must never reach a feature matrix, for any reason."""
     return set(
-        LEAKAGE_COLUMNS + EXCLUDED_VINTAGE_COLUMNS + HIGH_CARDINALITY_COLUMNS
+        LEAKAGE_COLUMNS
+        + EXCLUDED_VINTAGE_COLUMNS
+        + HIGH_CARDINALITY_COLUMNS
         + FAIR_LENDING_EXCLUDED_COLUMNS
-        + ALWAYS_MISSING_COLUMNS + JOINT_APPLICATION_COLUMNS + REDUNDANT_OR_CONSTANT_COLUMNS
-        + PLATFORM_COLUMNS + TARGET_TIMING_COLUMNS
-        + _RAW_COLUMNS_REPLACED_BY_DERIVED + _NON_FEATURE_COLUMNS
+        + ALWAYS_MISSING_COLUMNS
+        + JOINT_APPLICATION_COLUMNS
+        + REDUNDANT_OR_CONSTANT_COLUMNS
+        + PLATFORM_COLUMNS
+        + TARGET_TIMING_COLUMNS
+        + _RAW_COLUMNS_REPLACED_BY_DERIVED
+        + _NON_FEATURE_COLUMNS
         + ["default_flag", "split"]
     )
 
@@ -95,9 +128,12 @@ def tag_split(df: pl.DataFrame, split_config: dict) -> pl.DataFrame:
     oot_end = pl.lit(split_config["oot_test_end"]).str.strptime(pl.Date, "%Y-%m")
 
     return df.with_columns(
-        pl.when((issue_date >= train_start) & (issue_date <= train_end)).then(pl.lit("train"))
-        .when((issue_date >= val_start) & (issue_date <= val_end)).then(pl.lit("validation"))
-        .when((issue_date >= oot_start) & (issue_date <= oot_end)).then(pl.lit("oot_test"))
+        pl.when((issue_date >= train_start) & (issue_date <= train_end))
+        .then(pl.lit("train"))
+        .when((issue_date >= val_start) & (issue_date <= val_end))
+        .then(pl.lit("validation"))
+        .when((issue_date >= oot_start) & (issue_date <= oot_end))
+        .then(pl.lit("oot_test"))
         .otherwise(pl.lit("excluded"))
         .alias("split")
     )
