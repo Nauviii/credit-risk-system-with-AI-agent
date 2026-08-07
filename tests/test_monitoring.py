@@ -90,7 +90,7 @@ def test_significant_but_immaterial_deviation_does_not_alert():
     actual = (rng.random(n) < pd_values * 0.985).astype(int)
     result = expected_vs_actual(pd_values, actual)
     assert result["significant"]
-    assert not result["material"]
+    assert result["ratio_band"] == "stable"
     assert not result["alert"]
 
 
@@ -112,6 +112,18 @@ def test_concept_drift_is_caught_where_distributions_would_look_stable():
     assert result["alert"]
     assert result["z_score"] > 2
     assert result["ratio"] > 1.2
+    assert result["ratio_band"] == "material"
+
+
+def test_a_deviation_between_the_two_thresholds_lands_in_watch():
+    """The 2016 case: 9.97% off is not "stable" merely because the line was drawn at 10%."""
+    rng = np.random.default_rng(15)
+    n = 300_000
+    pd_values = rng.uniform(0.05, 0.15, n)
+    actual = (rng.random(n) < pd_values * 1.08).astype(int)
+    result = expected_vs_actual(pd_values, actual)
+    assert result["ratio_band"] == "watch"
+    assert result["alert"]
 
 
 def test_vintage_table_isolates_one_bad_cohort_inside_a_stable_book():
