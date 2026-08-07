@@ -141,8 +141,6 @@ def main() -> None:
         print(f"\nbest validation AUC: {study.best_value:.4f}")
         print("best params:", study.best_params)
 
-        # Retrain under the protocol train_baseline.py uses, then report against the
-        # sub_grade floor. Raw AUC is not comparable across splits; lift is.
         best_params = {
             "objective": "binary",
             "metric": "auc",
@@ -164,7 +162,7 @@ def main() -> None:
             print(name, {k: round(v, 4) for k, v in metrics.items()}, "lift", round(lifts[name], 4))
             for k, v in metrics.items():
                 mlflow.log_metric(f"tuned_{name}_{k}", v)
-        # The number that decides whether this run improved anything.
+
         print(f"\nlift collapse train -> oot: {lifts['train']:.4f} -> {lifts['oot_test']:.4f}")
         mlflow.log_metric("lift_collapse", lifts["train"] - lifts["oot_test"])
 

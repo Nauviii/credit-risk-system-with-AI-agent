@@ -1,13 +1,4 @@
-"""Vintage-level data diagnostics run BEFORE target definition and feature selection.
-
-These four tables decide three parameters that are currently assumed rather than
-measured: the outcome horizon H, the train window start year, and whether the
-2016 OOT set is trustworthy at all.
-
-Unlike evaluation/diagnostics.py (which inspects a fitted scorecard), everything
-here operates on the RAW ingested frame - target.build_target() drops exactly the
-censored rows we need to count, so it must not run first.
-"""
+"""Vintage-level data diagnostics run BEFORE target definition and feature selection."""
 
 import polars as pl
 

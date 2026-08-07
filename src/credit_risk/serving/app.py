@@ -1,18 +1,4 @@
-"""FastAPI service for the PD champion. Target: p95 under 200 ms per request.
-
-Three things drive that budget, and all three are structural rather than tuning:
-
-- The bundle is loaded ONCE at startup, not per request. Loading a 753-tree booster per
-  call would put latency in seconds.
-- Requests carry raw application fields and the service runs the same `clean_features`
-  used in training. This costs a few milliseconds and removes the class of bug where
-  serving derives a feature slightly differently from training.
-- A `/batch` route exists because per-row HTTP overhead dominates once a caller wants
-  hundreds of scores; looping `/score` client-side is the slow path, not the fast one.
-
-The service returns PD, the point score, and the model version that produced them. The
-version matters: a score without the artefact that produced it cannot be audited later.
-"""
+"""FastAPI service for the PD champion. Target: p95 under 200 ms per request."""
 
 import time
 from contextlib import asynccontextmanager

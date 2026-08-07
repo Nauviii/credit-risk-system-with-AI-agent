@@ -1,12 +1,4 @@
-"""Measure serving latency properly: percentiles over many warm requests, not one cold one.
-
-A single request through Swagger includes first-call warm-up - Polars, LightGBM and the
-JSON stack all pay a one-off cost - and reads far slower than steady state. The p95 target
-is a property of a warmed service under load, so measure it that way.
-
-Runs in-process against the ASGI app, which removes network and browser overhead and
-isolates what the service itself costs. Add network time separately when sizing infra.
-"""
+"""Measure serving latency properly: percentiles over many warm requests, not one cold one."""
 
 import argparse
 import statistics

@@ -1,8 +1,4 @@
-"""Interpretable WOE + logistic regression scorecard - the champion-challenger baseline.
-
-Any complexity added by the GBM champion (models/gbm.py) must earn its place by
-beating this on the OOT test set, not just on train.
-"""
+"""Interpretable WOE + logistic regression scorecard - the champion-challenger baseline."""
 
 import numpy as np
 import polars as pl

@@ -106,9 +106,6 @@ def monotone_edges(
         return []
 
     array = values.to_numpy().astype(float)
-    # side="left" matches Polars cut(), whose intervals are (lower, edge]. Using "right"
-    # shifts every value sitting exactly on an edge into the next bin, which silently
-    # empties the first bin on discrete features and drops the wrong cut point.
     indices = np.searchsorted(np.asarray(edges), array, side="left")
     n, bad = _aggregate(indices, target, len(edges) + 1)
     direction = _dominant_direction(n, bad)
@@ -117,9 +114,6 @@ def monotone_edges(
     while len(n) > 1:
         good = n - bad
         undersized = (n < min_n) | (bad < min_bin_bads) | (good < min_bin_bads)
-        # Never merge down to a single bin: that would silently zero out a feature's IV,
-        # including for a leaking feature that the >0.5 IV guard is supposed to catch.
-        # Keep the two-bin split and let binning_report() expose the undersized bin.
         if undersized.any() and len(n) > 2:
             n, bad, edges = _merge(n, bad, edges, _smallest_neighbour(n, undersized))
             continue

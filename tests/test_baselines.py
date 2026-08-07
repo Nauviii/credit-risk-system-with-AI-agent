@@ -25,8 +25,6 @@ def _frame() -> pl.DataFrame:
 def test_ordinal_string_feature_is_ranked_in_risk_order():
     single_vintage = _frame().filter(pl.col("issue_d") == "Jan-2013")
     assert score_only_auc(single_vintage, "sub_grade")["auc"] == 1.0
-    # pooled across two vintages the same ordering is no longer perfect - the
-    # aggregation effect auc_by_vintage exists to separate out
     assert score_only_auc(_frame(), "sub_grade")["auc"] < 1.0
 
 

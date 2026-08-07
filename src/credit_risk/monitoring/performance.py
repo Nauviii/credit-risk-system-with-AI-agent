@@ -19,12 +19,6 @@ import numpy as np
 import polars as pl
 
 _TARGET = "default_flag"
-
-
-# Graded, not a single cliff. The 2016 vintage backtest landed at a ratio of 1.0997 against
-# a 0.10 threshold and was classified "not material" by three thousandths - which is an
-# artefact of where the line was drawn, not a finding about 2016. Two levels plus the raw
-# ratio keeps the judgement with the reader instead of hiding it behind one boolean.
 WATCH_RATIO_TOLERANCE = 0.05
 MATERIAL_RATIO_TOLERANCE = 0.10
 

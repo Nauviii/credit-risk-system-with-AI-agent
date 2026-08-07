@@ -1,26 +1,4 @@
-"""Persist a trained champion so serving can load it, and load it back identically.
-
-Until now nothing in this project was ever saved: train_baseline.py fits models in memory,
-prints metrics and throws them away. That is fine for evaluation and impossible for serving.
-
-A bundle is a directory holding the booster plus one JSON file with everything else needed
-to turn a raw application into a score. Design decisions worth knowing:
-
-- Feature ORDER is stored, not just the set. LightGBM indexes columns positionally; a frame
-  built from a set would score silently wrong.
-- Categorical LEVELS are stored explicitly and re-applied at inference. LightGBM keeps its
-  own `pandas_categorical` mapping inside the model file, but relying on it means a
-  single-row request whose one category value differs from training order can be remapped.
-  Applying the stored levels makes the encoding independent of how pandas happens to infer
-  categories from one row.
-- The calibrator is stored as PARAMETERS, not as a pickle. A pickled sklearn estimator is
-  a version-coupled binary that can fail to load after a routine dependency bump - the last
-  thing wanted between a trained model and production. Only Platt is supported for exactly
-  this reason; it is two numbers. Isotonic is a step function with no compact form, and was
-  rejected on separate grounds in docs/evaluation_findings.md section 1.
-- Metadata records what the model was trained on, including a hash of the input file, so a
-  score in production can be traced back to a dataset and a config.
-"""
+"""Persist a trained champion so serving can load it, and load it back identically."""
 
 import hashlib
 import json
@@ -90,10 +68,6 @@ def save_bundle(
         },
         "central_tendency_shift": float(central_tendency_shift),
         "scaling": scaling or {"pdo": 20, "base_score": 600, "base_odds": 50.0},
-        # Frozen training distributions for the score and each numeric feature. Without
-        # them, drift monitoring in production has nothing to compare against - the train
-        # set is not there, and re-deriving a reference from live data would compare a
-        # population to itself and report stability that does not exist.
         "reference": reference or {},
         "metadata": metadata or {},
     }

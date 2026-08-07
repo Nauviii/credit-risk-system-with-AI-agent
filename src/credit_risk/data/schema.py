@@ -202,6 +202,6 @@ RAW_ACCEPTED_SCHEMA = pa.DataFrameSchema(
         "total_acc": Column(pl.Float64, nullable=True),
         "application_type": Column(pl.Utf8, nullable=True),
     },
-    strict=False,  # raw file has ~150 cols; we only contract the ones we currently use
+    strict=False,
     coerce=True,
 )

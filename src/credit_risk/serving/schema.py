@@ -1,14 +1,4 @@
-"""What a scoring request must contain, derived from the bundle rather than hand-listed.
-
-The API accepts RAW application fields, not model features, and runs the same
-`clean_features` pipeline the training path runs. Asking a client to send `term_months`,
-`credit_history_months` and the `has_*` flags would push feature engineering across the
-network boundary, which is the textbook source of training/serving skew: two
-implementations of the same derivation that drift apart silently.
-
-The required field list is computed from the loaded bundle, so it cannot fall out of sync
-with the model. Retrain with a different feature set and the contract follows.
-"""
+"""What a scoring request must contain, derived from the bundle rather than hand-listed."""
 
 import polars as pl
 
@@ -20,18 +10,7 @@ DERIVED_FROM: dict[str, list[str]] = {
     "credit_history_months": ["earliest_cr_line", "issue_d"],
 }
 
-# `clean_features` reads these regardless of whether the model uses their output.
 _ALWAYS_REQUIRED = ["term", "earliest_cr_line", "issue_d"]
-
-# Fields that must be present AND non-null for a score to mean anything. Everything else
-# is a bureau attribute that a lender can genuinely fail to pull, and null is a real value
-# the model handles. These are the ones that exist on any application by construction -
-# if they are absent, the caller has sent something malformed, not something incomplete.
-#
-# Without this check the service happily scores an EMPTY payload: every field becomes null,
-# the model returns its "everything unknown" prediction near the base rate, and the caller
-# receives a plausible-looking PD computed from nothing. In credit decisioning that is far
-# worse than a rejected request.
 CORE_REQUIRED_FIELDS = [
     "loan_amnt",
     "annual_inc",
@@ -42,8 +21,6 @@ CORE_REQUIRED_FIELDS = [
     "earliest_cr_line",
 ]
 
-# Beyond the core fields, refuse an application whose bureau section is mostly absent. The
-# model tolerates scattered nulls; it was never evaluated on a near-empty applicant.
 MIN_FIELD_COVERAGE = 0.5
 
 

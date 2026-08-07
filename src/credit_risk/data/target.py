@@ -54,8 +54,6 @@ def build_target(df: pl.DataFrame, config_path: Path) -> pl.DataFrame:
     year, month = (int(part) for part in str(cfg["data_cutoff"]).split("-"))
     cutoff_index = year * 12 + month
 
-    # cast to Utf8 first: a chunk where the column is entirely null arrives as Null dtype,
-    # which strptime rejects.
     issued = _month_index(
         pl.col("issue_d").cast(pl.Utf8).str.strptime(pl.Date, "%b-%Y", strict=False)
     )
@@ -69,8 +67,6 @@ def build_target(df: pl.DataFrame, config_path: Path) -> pl.DataFrame:
         .str.strip_chars()
         .alias("loan_status"),
         (cutoff_index - issued).alias("mob_observable"),
-        # A null last_pymnt_d means no payment was ever made, so the event lands at the
-        # earliest possible month - not missing data to be dropped.
         (last_paid - issued + lag).fill_null(lag).alias("mob_event"),
     )
     out = out.filter(pl.col("mob_observable") >= horizon)

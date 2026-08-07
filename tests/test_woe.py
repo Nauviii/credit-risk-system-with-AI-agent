@@ -117,11 +117,6 @@ def test_zero_bad_bin_woe_is_bounded_by_sample_size_not_by_an_epsilon():
     legacy = np.log((500 / 750) / 1e-6)  # what the old proportion-level epsilon produced
     assert worst < legacy / 2
     assert worst < np.log(2 * 250) + 1  # scales with the bad count, not the epsilon
-
-    # With only two possible bins there is nowhere to merge to, so the feature is kept
-    # rather than zeroed - the two-bin floor wins over min_bin_bads by design. An extreme
-    # WOE surviving here is acceptable because such a feature also carries a huge IV and
-    # is caught by the ">0.5 suspicious - check leakage" screen.
     assert WOEEncoder(["x"]).fit(df).binning_report()["n_bins"][0] == 2
 
 

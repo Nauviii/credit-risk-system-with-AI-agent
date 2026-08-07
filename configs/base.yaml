@@ -1,8 +1,6 @@
 random_seed: 42
 
 target:
-  # Fixed outcome window, not a maturity filter. Rationale and the measured censoring
-  # bias that forced the change are in data/target.py's module docstring.
   definition: "fixed_horizon"
   data_cutoff: "2018-12"
   # H=24 is the largest horizon under which the 2016 vintage is still fully observable

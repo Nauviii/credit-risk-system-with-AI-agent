@@ -174,12 +174,8 @@ def _evaluate_and_log(
         for k, v in metrics.items():
             mlflow.log_metric(f"{split_name}_{k}", v)
         if split_name == "train":
-            # Train spans two vintages; a pooled AUC below every per-year AUC is an
-            # aggregation artefact, not evidence of poor within-year discrimination.
             print("  per-vintage:", auc_by_vintage(df, pred).to_dicts())
         if split_name == "oot_test":
-            # Decides whether one model can serve both terms, or whether the 24-month
-            # horizon has made the label mean different things on each side.
             segment = auc_by_segment(
                 df.with_columns(pl.col("term_months").cast(pl.Utf8)), pred, "term_months"
             )
@@ -219,15 +215,10 @@ def main() -> None:
                 collect=oot_predictions,
             )
 
-    # sub_grade used directly is the floor every model is tested against, so it belongs in
-    # the same collection - ranked lexicographically, which is its true risk order.
     oot = splits["oot_test"]
     if "sub_grade" in oot.columns:
         oot_predictions["sub_grade"] = oot["sub_grade"].rank("dense").to_numpy().astype(float)
 
-    # Both pools, so the 2x2 (linear vs GBM) x (full vs application-only) grid is complete.
-    # Without the application-only GBM, a weak application-only scorecard cannot be told
-    # apart from application data genuinely carrying less signal than LendingClub's grade.
     for label, pool, run_name in (
         ("GBM (full)", gbm_features(final), "gbm_full_v2"),
         ("GBM (application-only)", application_features(final), "gbm_application_v2"),

@@ -1,9 +1,4 @@
-"""Scorecard diagnostics - coefficient sign sanity check and multicollinearity report.
-
-Used from notebooks/feature_selection_scorecard.py during feature selection, kept
-separate from scripts/train_baseline.py (which only trains/evaluates already-decided
-features) so analysis and training stay independently runnable and reviewable.
-"""
+"""Scorecard diagnostics - coefficient sign sanity check and multicollinearity report."""
 
 import pandas as pd
 import polars as pl

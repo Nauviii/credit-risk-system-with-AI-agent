@@ -37,8 +37,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 
-# Both tools are pinned explicitly rather than left on defaults, so CI and a developer's
-# machine cannot disagree because they resolved different minor versions.
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -52,8 +50,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests import inside functions on purpose, to keep optional heavy deps (shap, lightgbm)
-# out of collection when a single unrelated test file is run.
+
 "tests/*" = ["E402", "F401"]
 
 [tool.black]

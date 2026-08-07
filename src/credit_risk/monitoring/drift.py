@@ -1,14 +1,4 @@
-"""Distribution drift against the reference frozen inside the model bundle.
-
-Pairs with monitoring/performance.py and answers a different question. This module asks
-whether the population still looks like the one the model was fitted on; that one asks
-whether outcomes still match what it predicted. Phase 5 showed a case where the first said
-yes and the second said no, so neither substitutes for the other.
-
-What a green result here actually licenses: it says the score's inputs are in familiar
-territory, so a performance alert is more likely to be genuine deterioration than a feed
-problem. That is useful, and it is not the same as saying the model is fine.
-"""
+"""Distribution drift against the reference frozen inside the model bundle."""
 
 import polars as pl
 

@@ -1,13 +1,4 @@
-"""Train the champion and write a servable bundle. The only place artefacts are produced.
-
-Separate from train_baseline.py by design. That script is the evaluation harness: it trains
-four models to compare them and keeps nothing. This one trains exactly the champion, applies
-the calibration and anchoring decided in Phase 5, and writes something serving can load.
-
-Champion: GBM on application-only features, Platt-calibrated on validation (2015), anchored
-to the long-run rate across the three observed vintages. Rationale in PROJECT_HANDOFF.md
-section 1 and docs/evaluation_findings.md section 1.
-"""
+"""Train the champion and write a servable bundle. The only place artefacts are produced."""
 
 import argparse
 from pathlib import Path
@@ -57,20 +48,12 @@ def main() -> None:
     raw = {n: booster.predict(prepare_lgb_frame(df, features)) for n, df in splits.items()}
     y = {n: df["default_flag"].to_numpy() for n, df in splits.items()}
 
-    # Fitted on validation, never on train: on train it would re-learn the fit the model
-    # already has and report a calibration quality that does not exist out of sample.
     calibrator = Calibrator("platt").fit(y["validation"], raw["validation"])
     calibrated_oot = calibrator.transform(raw["oot_test"])
 
     long_run_rate = float(np.mean([y[n].mean() for n in splits]))
     shift = central_tendency_shift(calibrated_oot, long_run_rate)
 
-    # Frozen training distributions, so production drift monitoring has something to
-    # compare against once the train set is no longer around.
-    # Profiled on POINTS, because points are what DriftMonitor compares. Profiling the
-    # calibrated probability instead put the reference on a 0-0.17 range while monitoring
-    # passed 473-649, so every live value fell in the final bin and PSI became a constant
-    # 12.4339 for every population - large, stable, and completely uninformative.
     train_pd = calibrator.transform(raw["train"])
     train_logits = np.log(train_pd / (1 - train_pd)) + shift
     train_scores = pd_to_score(1 / (1 + np.exp(-train_logits)))
