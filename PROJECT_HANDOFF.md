@@ -181,9 +181,13 @@ uninterpretable: `sub_grade` alone reaches Gini 0.3778 on OOT.
 | Linear (WOE + LR) | 0.7015 / Gini 0.4031 | 0.6665 / Gini 0.3331 |
 | GBM (tuned) | 0.7135 / Gini 0.4270 | **0.6964 / Gini 0.3929** ← champion |
 
-- **Champion: GBM application-only.** Beats `sub_grade` used alone by +0.0076 AUC, without
-  seeing it. Full pool is reported as a benchmark, not taken forward.
-- LendingClub's grade/rate contribute **+0.0171 AUC** measured within the same model class
+- **Champion: GBM application-only.** Beats `sub_grade` used alone by +0.0076 AUC (95% CI
+  [+0.0054, +0.0097], DeLong p = 5.3e-12), without seeing it. Note this is a framing
+  decision, not a performance claim: Scorecard (full) at [0.6992, 0.7039] outperforms it
+  and does not overlap. The champion is the best model that does not consume LendingClub's
+  own risk output. Full pool is reported as a benchmark, not taken forward.
+- LendingClub's grade/rate contribute **+0.0171 AUC** (95% CI [+0.0158, +0.0183]) measured
+  within the same model class
   (GBM full minus GBM application-only). The linear comparison (+0.0350) overstates it.
 - The GBM's advantage over the scorecard is +0.0122 with `sub_grade` present but +0.0294
   without it. Most of what the GBM adds is work `sub_grade` was already doing — it is
@@ -213,6 +217,14 @@ Per-vintage AUC on train (2013 vs 2014) sits either side of the pooled figure, s
 no aggregation artefact. The rise in AUC across vintages is specific to `sub_grade` (0.669 →
 0.694): **LendingClub's grading model improved over time**, and any model containing it
 inherits that rise. The application-only model is flat to slightly declining across vintages.
+
+**Discrimination decays inside the OOT year.** Champion Gini by 2016 issue quarter:
+0.4175, 0.3935, 0.3785, 0.3713 — monotone, with non-overlapping Q1/Q4 confidence intervals.
+The quarter-to-quarter swing of 0.0462 Gini is three times the champion's entire edge over
+`sub_grade` (0.0152 Gini). Two consequences: the pooled OOT figure averages over a declining
+trend and overstates the model's end-of-period state, and the Phase 9 concept drift eroded
+ranking power, not only level. Per-cohort Gini belongs in the monitoring set alongside PSI
+and expected-versus-actual.
 
 Per-term OOT AUC, GBM application-only: term 36 = 0.6934, term 60 = 0.6924, pooled = 0.6972.
 Within-term discrimination is identical, and pooled sits above both because term itself
@@ -391,7 +403,8 @@ which is consistent with the champion beating `sub_grade` by only +0.0084 AUC.
 6. **Tuning still touches 2015 twice.** Early stopping now runs on an inner temporal slice of
    train, but 2015 is the Optuna objective across 50 trials *and* the early-stopping set for
    the final model. OOT 2016 is untouched, which is what protects the headline number.
-7. **The whole evaluation rests on one OOT vintage**, and 2016 ran materially worse than train.
+7. **The whole evaluation rests on one OOT vintage**, and 2016 ran materially worse than
+   train — and degraded monotonically within it (Section 4).
 8. `notebooks/eda.ipynb` still calls `build_target(df)` with one argument and will fail. Low
    priority but not forgotten.
 11. **Monitoring has no alerting infrastructure.** Phase 9 delivered tested functions and a

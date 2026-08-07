@@ -162,7 +162,22 @@ scaled by hazard coverage. Alert on significant *and* materially deviating.
 
 ---
 
-## 7. Limitations
+## 7. A third signal the current set is missing
+
+Phase 9 tracks distributions and outcome levels. It does not track discrimination, and the
+significance work found that discrimination itself decayed through 2016: champion Gini by
+issue quarter ran 0.4175, 0.3935, 0.3785, 0.3713, monotone, with non-overlapping Q1/Q4
+confidence intervals (`docs/modeling_findings.md`).
+
+Neither existing instrument would have caught that. Score PSI on the same vintage was 0.0007.
+Expected-versus-actual measures the level and returned a ratio of 1.100, which says nothing
+about whether the ranking still separates good from bad.
+
+`evaluation.significance.gini_by_period` already computes Gini with a confidence interval per
+period. It should join the monthly outcome-side pass, on the same lag as
+expected-versus-actual, since both need matured outcomes. Not wired in.
+
+## 8. Limitations
 
 1. **Hazard coverage comes from one vintage** (2013) and assumes default timing is stable
    across cohorts. Verified between 2013–2014 and 2016 in Phase 5, but an assumption that
@@ -176,3 +191,5 @@ scaled by hazard coverage. Alert on significant *and* materially deviating.
    relative to that baseline.
 5. **No alerting infrastructure.** These are tested functions and a simulation. Scheduling,
    thresholds per environment, notification routing and an alert audit trail are not built.
+6. **Discrimination is not monitored** (Section 7), and 2016 shows it can decay while both
+   existing instruments look explainable.

@@ -64,8 +64,8 @@ LendingClub's own risk output and unavailable at decision time.
 
 Four readings from this 2×2:
 
-1. Application data alone **beats** LendingClub's grade (+0.0076 AUC over `sub_grade`),
-   but only with a GBM. The linear scorecard cannot (−0.0223). What was missing was model
+1. Application data alone **beats** LendingClub's grade (+0.0076 AUC, 95% CI
+   [+0.0054, +0.0097], p = 5.3e-12), but only with a GBM. The linear scorecard cannot (−0.0223). What was missing was model
    capacity, not signal.
 2. LendingClub's grade and rate contribute **+0.0171 AUC** measured within the same model
    class. The linear comparison (+0.0350) overstates the dependence by half.
@@ -74,6 +74,74 @@ Four readings from this 2×2:
    itself a fitted model output carrying non-linearities and interactions.
 4. Discrimination held on OOT for every model. The 2016 problem is a level shift, not a
    ranking failure — see `evaluation_findings.md`.
+
+## Significance and stability of the differences
+
+Every conclusion in this document rests on small AUC differences. All three are tested with
+DeLong (1988), which is the correct test because all models are scored on the SAME 434,407
+loans and their AUCs are therefore correlated - an unpaired comparison would badly overstate
+the standard error of the difference.
+
+### OOT AUC with 95% confidence intervals
+
+| Model | AUC | 95% CI |
+|---|---|---|
+| GBM (full) | 0.7135 | [0.7112, 0.7158] |
+| Scorecard (full) | 0.7015 | [0.6992, 0.7039] |
+| GBM (application-only) — champion | 0.6964 | [0.6941, 0.6988] |
+| `sub_grade` alone | 0.6889 | [0.6865, 0.6913] |
+| Scorecard (application-only) | 0.6665 | [0.6641, 0.6690] |
+
+### Paired differences
+
+| Comparison | Difference | 95% CI | p | Verdict |
+|---|---|---|---|---|
+| Champion vs `sub_grade` alone | **+0.0076** | [+0.0054, +0.0097] | 5.3e-12 | significant |
+| Lender-derived contribution (GBM full − app-only) | **+0.0171** | [+0.0158, +0.0183] | 7.3e-155 | significant |
+| GBM vs scorecard, application-only pool | **+0.0299** | [+0.0284, +0.0314] | < 1e-300 | significant |
+
+All three hold. Note how much the pairing matters on the first: each model's own interval is
+about ±0.0023 wide, so a 0.0076 gap would look marginal if the AUCs were treated as
+independent. The paired standard error is 0.0011, and the interval clears zero comfortably.
+
+Note also that Scorecard (full) at [0.6992, 0.7039] does not overlap the champion at
+[0.6941, 0.6988]. The champion is **not** the best-performing model available — it is the
+best model that does not consume LendingClub's own risk output. That is a framing decision
+(Section 1 of PROJECT_HANDOFF.md), not a performance claim, and it should be stated that way.
+
+### Per-quarter Gini — the finding that changes how the headline reads
+
+Champion, 2016 out-of-time set, by issue quarter:
+
+| Quarter | n | Defaults | Gini | 95% CI |
+|---|---|---|---|---|
+| 2016Q1 | 133,887 | 15,229 | **0.4175** | [0.4091, 0.4258] |
+| 2016Q2 | 97,854 | 11,341 | 0.3935 | [0.3836, 0.4034] |
+| 2016Q3 | 99,120 | 11,783 | 0.3785 | [0.3686, 0.3884] |
+| 2016Q4 | 103,546 | 10,974 | **0.3713** | [0.3612, 0.3814] |
+| pooled | 434,407 | 49,327 | 0.3929 | [0.3881, 0.3976] |
+
+**Quarter-to-quarter swing: 0.0462 Gini.** The champion's entire edge over `sub_grade`
+(+0.0076 AUC = +0.0152 Gini) is one third of the range the model's own discrimination covers
+inside a single year. The difference is real; it is not large relative to the noise floor a
+portfolio actually operates in, and the headline should say so.
+
+**Discrimination decays monotonically through 2016**, from 0.4175 to 0.3713 — an 11% loss of
+Gini across four quarters. Q1 and Q4 confidence intervals do not overlap, so this is a clean
+signal rather than sampling variation. Two consequences:
+
+1. The pooled OOT Gini of 0.3929 is an average over a declining trend and **overstates the
+   model's state at the end of the period**. Any single-number OOT result on a vintage this
+   long carries the same problem.
+2. Read against Phase 9: score PSI on 2016 was 0.0007 and outcomes ran 10% worse than
+   predicted. The concept drift did not only shift the level — it eroded ranking power too,
+   and neither of the two monitoring instruments currently tracks that. Per-cohort Gini with
+   a confidence interval belongs in the monitoring set as a third outcome-side signal;
+   `evaluation.significance.gini_by_period` already computes it.
+
+Issuance also falls sharply after Q1 (133,887 to 97,854, a 27% drop) and stays down, which is
+consistent with LendingClub tightening credit during 2016. Worth verifying independently
+rather than asserting.
 
 ## Hyperparameter tuning is at its ceiling — do not continue
 
