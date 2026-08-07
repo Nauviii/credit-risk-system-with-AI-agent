@@ -59,7 +59,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 USER appuser
 
-# No model artefacts are baked in - none are persisted yet (see PROJECT_HANDOFF section 8).
-# Phase 8 replaces this CMD with `uvicorn credit_risk.serving.app:app --host 0.0.0.0 --port 8000`
-# and mounts or copies the trained artefacts.
-CMD ["python", "-c", "import credit_risk; print('credit_risk image ready')"]
+# Artefacts are NOT baked into the image. A bundle is ~5 MB and changes on every retrain,
+# while the image changes on every code change - baking them together forces a rebuild for
+# each and makes it impossible to tell which model an image is serving. Mount instead:
+#   docker run -p 8000:8000 -v ./artifacts:/app/artifacts:ro credit-risk-system
+# The service fails fast at startup if the bundle is absent, so a misconfigured mount is a
+# crash on boot rather than a 503 on the first real request.
+EXPOSE 8000
+CMD ["uvicorn", "credit_risk.serving.app:app", "--host", "0.0.0.0", "--port", "8000"]

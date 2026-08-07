@@ -2,7 +2,7 @@
 
 **Repo:** https://github.com/Nauviii/credit-risk-system-with-AI-agent.git
 **Environment:** Windows, PowerShell, `uv`-managed venv, Python 3.12, local dev at `D:\Project_DS\credit-risk-system`
-**Status:** Phases 0–5 complete, including the decision layer. 75 tests passing.
+**Status:** Phases 0–9 complete. 127 tests passing, CI green, service containerised.
 
 > **This document was rewritten from scratch.** An earlier version described a different
 > target definition, train window, feature set and results table, all of which were found
@@ -28,10 +28,10 @@ interest income, recoveries, prepayment — and PD alone cannot support any deci
 
 Planned layers, in order:
 1. Business framing → EDA → preprocessing → modeling → evaluation → decision layer (**complete**)
-2. Explainability (Phase 6), MLOps (7), serving (8), monitoring (9)
-3. AI agent orchestration + LLMOps (Phase 10) — deferred until the above is solid. When it
-   happens it must be a separate service calling the PD serving API, never embedded in
-   `credit_risk`, to preserve the core service's latency guarantees.
+2. Explainability (Phase 6), MLOps (7), serving (8), monitoring (9) — **complete**
+3. AI agent orchestration + LLMOps (Phase 10) — the only phase not started. It must be a
+   separate service calling the PD serving API, never embedded in `credit_risk`, to preserve
+   the core service's latency guarantees (measured p95: 27.5 ms against a 200 ms budget).
 
 Standing constraints:
 - Sample-data results are hypotheses; every material finding is re-confirmed on full data
@@ -292,6 +292,10 @@ giving odds ratios of 2.04, 1.92, 1.81, 1.79 — the doubling per 20 points the 
 
 ## 6. Stability — and why PSI would have missed the problem
 
+> Phase 9 confirmed this on real vintages. Score PSI on the 2016 out-of-time set is
+> **0.0007** while realised defaults ran 10% above prediction. Full results in
+> `docs/monitoring_findings.md`.
+
 `evaluation/stability.py`. Same fit-on-reference discipline as `WOEEncoder`: bin edges come
 from train and are frozen.
 
@@ -390,6 +394,11 @@ which is consistent with the champion beating `sub_grade` by only +0.0084 AUC.
 7. **The whole evaluation rests on one OOT vintage**, and 2016 ran materially worse than train.
 8. `notebooks/eda.ipynb` still calls `build_target(df)` with one argument and will fail. Low
    priority but not forgotten.
+11. **Monitoring has no alerting infrastructure.** Phase 9 delivered tested functions and a
+    simulation; scheduling, per-environment thresholds, notification routing and an alert
+    audit trail are not built.
+12. **Serving carries no authentication, rate limiting or request logging.** The service is
+    correct and fast, not hardened.
 9. `README.md` is intentionally not up to date; scheduled for the end of the project.
 10. Every commit message so far is `"updated"`. Flagged once, deprioritised by choice.
 
@@ -501,17 +510,23 @@ uv run pytest tests/ -v          # 75 passed
 uv run python scripts/train_baseline.py --input data/raw/accepted_2007_to_2018Q4.csv
 ```
 
-Immediate next task: **Phase 6, explainability.** SHAP on the champion GBM, plus WOE tables
-and coefficients for the scorecard, confirming both rely on sensible drivers. After
-everything found about `sub_grade` and endogeneity, this is a substantive check rather than
-a formality: the question is whether the application-only model's drivers are ones a credit
-officer would recognise and defend.
+```powershell
+# Build a servable bundle (writes artifacts/champion, ~10 s of that is hashing the input)
+uv run python scripts/build_artifacts.py --input data/raw/accepted_2007_to_2018Q4.csv
 
-Then, in order: Phase 7 (CI/CD, Dockerfile), Phase 8 (FastAPI, p95 < 200ms), Phase 9
-(monitoring — must include actual-versus-expected default rate by vintage, per Section 6),
-Phase 10 (agent layer, as a separate service).
+# Serve it
+uv run uvicorn credit_risk.serving.app:app --reload    # http://localhost:8000/docs
+docker run -p 8000:8000 -v ./artifacts:/app/artifacts:ro credit-risk-system:local
+```
 
-Two pieces of documentation are outstanding and should be written while the numbers are
-fresh: `docs/evaluation_findings.md` (Sections 5–7 of this document, with the full tables)
-and an update to `docs/modeling_findings.md`, whose current contents predate every
-correction listed in Section 9.
+Immediate next task: **Phase 10, the agent layer.** Everything it needs is in place — a
+versioned artefact, a scoring API with provenance on `/model`, a decision layer that turns a
+PD into a cutoff, and monitoring that can tell it whether the model is still trustworthy.
+
+Build it as a separate service. The PD path is measured at p95 27.5 ms and that budget cannot
+absorb an LLM call. The agent consumes `/score`, `/model` and the monitoring outputs over
+HTTP; nothing about it belongs inside `credit_risk`.
+
+Documentation is current as of this handoff: `eda_findings.md`, `modeling_findings.md`,
+`evaluation_findings.md`, `explainability_findings.md`, `monitoring_findings.md`. `README.md`
+is the one remaining gap and was deliberately left for last.

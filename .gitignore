@@ -21,3 +21,6 @@ data/processed/*
 
 # Editor config belongs in .vscode/, and it holds machine-specific interpreter paths.
 /settings.json
+
+# Trained model bundles: reproducible from scripts/build_artifacts.py, so not tracked.
+artifacts/

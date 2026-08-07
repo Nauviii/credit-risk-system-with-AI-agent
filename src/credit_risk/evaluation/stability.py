@@ -74,6 +74,55 @@ def population_stability_index(
     return float(psi_table(reference, actual, edges)["psi_contribution"].sum())
 
 
+def reference_profile(values: pl.Series, n_bins: int = 10) -> dict:
+    """Freeze a distribution as edges + shares, so PSI can be computed without the train set.
+
+    Production has one population in hand, not two. psi_table needs both, which is fine in a
+    notebook and impossible in a service. This is the serialisable half: compute it once at
+    build time, ship it with the model, compare against it forever.
+    """
+    edges = psi_bin_edges(values, n_bins)
+    return {"edges": edges, "shares": _shares(values, edges, len(edges) + 1).tolist()}
+
+
+def psi_against_reference(values: pl.Series, profile: dict) -> float:
+    """PSI of a live population against a frozen reference profile."""
+    edges = profile["edges"]
+    reference = np.maximum(np.asarray(profile["shares"], dtype=float), _EPS)
+    actual = np.maximum(_shares(values, edges, len(edges) + 1), _EPS)
+    return float(((actual - reference) * np.log(actual / reference)).sum())
+
+
+def outside_reference_range(values: pl.Series, profile: dict) -> float:
+    """Share of live values falling beyond the reference's outermost bin edges.
+
+    Guards against the failure mode that produced a constant PSI of 12.4339 across three
+    unrelated populations: the reference had been built on calibrated probabilities (0-0.17)
+    while monitoring passed point scores (473-649). Every value landed in the final bin, so
+    PSI stopped depending on the data and became a property of the reference alone.
+
+    PSI cannot signal this - it is a perfectly well-defined number for a distribution sitting
+    entirely outside the reference. A value near 1.0 here means the two are not comparable
+    quantities, which is a configuration bug, not drift.
+
+    Measured as EXCESS mass in the two open-ended outer bins, not raw mass. Quantile edges
+    are interior cut points, so roughly 2/n_bins of an identical population sits outside them
+    by construction; subtracting the reference's own share makes 0.0 the value for a
+    population that matches, whatever the bin count.
+    """
+    edges = profile["edges"]
+    if not edges:
+        return 0.0
+    non_null = values.drop_nulls()
+    if non_null.len() == 0:
+        return 0.0
+    array = non_null.to_numpy().astype(float)
+    live_outer = float(((array <= edges[0]) | (array > edges[-1])).mean())
+    shares = profile["shares"]
+    reference_outer = float(shares[0] + shares[-2])  # last entry is the missing bin
+    return max(live_outer - reference_outer, 0.0)
+
+
 def psi_report(
     reference_df: pl.DataFrame, actual_df: pl.DataFrame, features: list[str], n_bins: int = 10
 ) -> pl.DataFrame:

@@ -21,6 +21,8 @@ dependencies = [
     "matplotlib>=3.8",
     "numba>=0.60",
     "optuna-integration>=4.9.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 
 [dependency-groups]
@@ -29,6 +31,7 @@ dev = [
     "ruff>=0.4",
     "black>=24.4",
     "pre-commit>=3.7",
+    "httpx>=0.27",  # required by fastapi.testclient
 ]
 
 [tool.pytest.ini_options]
